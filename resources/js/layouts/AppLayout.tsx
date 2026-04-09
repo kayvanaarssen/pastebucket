@@ -12,7 +12,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sun, Moon, Monitor, LogOut, LayoutDashboard, Shield, Plus, Menu, X } from 'lucide-react';
+import { Sun, Moon, Monitor, LogOut, LayoutDashboard, Shield, Plus, Menu, X, UserCog } from 'lucide-react';
 
 interface AppLayoutProps {
     children: ReactNode;
@@ -110,6 +110,12 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                                             My Pastes
                                         </Link>
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/profile">
+                                            <UserCog className="mr-2 h-4 w-4" />
+                                            Profile
+                                        </Link>
+                                    </DropdownMenuItem>
                                     {auth.user.is_admin && (
                                         <DropdownMenuItem asChild>
                                             <Link href="/admin">
@@ -162,12 +168,20 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                                 </Link>
                             </Button>
                             {auth.user && (
-                                <Button variant="ghost" size="sm" className="justify-start" asChild>
-                                    <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
-                                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                                        My Pastes
-                                    </Link>
-                                </Button>
+                                <>
+                                    <Button variant="ghost" size="sm" className="justify-start" asChild>
+                                        <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                                            My Pastes
+                                        </Link>
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="justify-start" asChild>
+                                        <Link href="/profile" onClick={() => setMobileMenuOpen(false)}>
+                                            <UserCog className="mr-2 h-4 w-4" />
+                                            Profile
+                                        </Link>
+                                    </Button>
+                                </>
                             )}
                             {auth.user?.is_admin && (
                                 <Button variant="ghost" size="sm" className="justify-start" asChild>
