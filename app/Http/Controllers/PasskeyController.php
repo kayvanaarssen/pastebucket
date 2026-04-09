@@ -102,6 +102,11 @@ class PasskeyController extends Controller
             return back()->withErrors(['error' => 'Failed to parse attestation data.']);
         }
 
+        \Log::info('Passkey registration', [
+            'credential_id' => $credential['id'],
+            'rawId' => $credential['rawId'],
+        ]);
+
         $request->user()->passkeys()->create([
             'name' => $request->input('name'),
             'credential_id' => $credential['id'],
