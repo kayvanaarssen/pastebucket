@@ -102,15 +102,17 @@ class PasskeyController extends Controller
             return back()->withErrors(['error' => 'Failed to parse attestation data.']);
         }
 
-        \Log::info('Passkey registration', [
-            'credential_id' => $credential['id'],
-            'rawId' => $credential['rawId'],
-        ]);
+        // Store only what we need, with the algorithm identifier
+        $coseKey = $authData['cose_key'] ?? [];
+        $storedData = [
+            'public_key_pem' => $authData['public_key_pem'],
+            'algorithm' => $coseKey[3] ?? null,
+        ];
 
         $request->user()->passkeys()->create([
             'name' => $request->input('name'),
             'credential_id' => $credential['id'],
-            'public_key' => json_encode($authData),
+            'public_key' => json_encode($storedData),
             'counter' => $authData['counter'] ?? 0,
             'transports' => $credential['transports'] ?? [],
         ]);
@@ -370,7 +372,7 @@ class PasskeyController extends Controller
         $publicKey = openssl_pkey_get_public($pem);
         if (!$publicKey) return false;
 
-        $alg = $publicKeyData['cose_key'][3] ?? null;
+        $alg = $publicKeyData['algorithm'] ?? $publicKeyData['cose_key'][3] ?? null;
 
         if ($alg === -7) {
             // ES256 - need to convert from DER to raw signature format
