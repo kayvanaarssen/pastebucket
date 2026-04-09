@@ -101,23 +101,21 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                             )}
                         </div>
                     )}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowPreview(!showPreview)}
+                        disabled={!data.content.trim()}
+                        className="text-xs"
+                    >
+                        {showPreview ? <EyeOff className="mr-1.5 h-3.5 w-3.5" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
+                        {showPreview ? 'Edit' : 'Preview'}
+                    </Button>
                 </div>
 
                 {/* Textarea / Preview */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-end">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowPreview(!showPreview)}
-                            disabled={!data.content.trim()}
-                            className="text-xs"
-                        >
-                            {showPreview ? <EyeOff className="mr-1.5 h-3.5 w-3.5" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
-                            {showPreview ? 'Edit' : 'Preview'}
-                        </Button>
-                    </div>
+                <div>
                     {showPreview && data.content.trim() ? (
                         <div className="overflow-x-auto rounded-lg border min-h-[200px] sm:min-h-[300px]">
                             <CodeHighlighter code={data.content} language={effectiveLanguage || 'text'} />
