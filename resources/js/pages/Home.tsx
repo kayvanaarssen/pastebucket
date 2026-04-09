@@ -211,7 +211,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 placeholder="Optional"
                                 value={data.password}
                                 onChange={e => setData('password', e.target.value)}
-                                className="h-8 w-[110px] text-xs"
+                                className="h-8 w-[140px] text-xs"
                             />
                         </div>
                         <div className="flex flex-col items-center gap-1">

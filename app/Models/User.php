@@ -39,6 +39,11 @@ class User extends Authenticatable
         return $this->hasMany(Paste::class);
     }
 
+    public function passkeys(): HasMany
+    {
+        return $this->hasMany(Passkey::class);
+    }
+
     /**
      * Determine if the user is an admin.
      */
