@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Fingerprint, KeyRound, Plus, Trash2, User, Lock } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import type { PageProps } from '@/types';
 
@@ -40,6 +40,7 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
     const [passkeyName, setPasskeyName] = useState('');
     const [registering, setRegistering] = useState(false);
     const [passkeyError, setPasskeyError] = useState<string | null>(null);
+    const [deletePasskeyId, setDeletePasskeyId] = useState<number | null>(null);
 
     const supportsPasskeys = typeof window !== 'undefined' && browserSupportsWebAuthn();
 
@@ -100,12 +101,12 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
     };
 
     const deletePasskey = async (id: number) => {
-        if (!confirm('Remove this passkey?')) return;
         await fetch(`/passkey/${id}`, {
             method: 'DELETE',
             headers: { 'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '') },
         });
         fetchPasskeys();
+        setDeletePasskeyId(null);
     };
 
     const formatDate = (dateStr: string) => {
@@ -241,7 +242,7 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 text-destructive hover:text-destructive"
-                                                onClick={() => deletePasskey(pk.id)}
+                                                onClick={() => setDeletePasskeyId(pk.id)}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -280,6 +281,27 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
                         <Button onClick={registerPasskey} disabled={registering || !passkeyName.trim()}>
                             <Fingerprint className="mr-1.5 h-4 w-4" />
                             {registering ? 'Registering...' : 'Register'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!deletePasskeyId} onOpenChange={() => setDeletePasskeyId(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Remove Passkey</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to remove this passkey? You won't be able to sign in with it anymore.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeletePasskeyId(null)}>Cancel</Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => deletePasskeyId && deletePasskey(deletePasskeyId)}
+                        >
+                            <Trash2 className="mr-1.5 h-4 w-4" />
+                            Remove
                         </Button>
                     </DialogFooter>
                 </DialogContent>

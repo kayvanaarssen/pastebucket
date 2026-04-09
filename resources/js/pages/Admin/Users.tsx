@@ -125,6 +125,7 @@ function UserDialog({ user, open, onOpenChange }: {
 export default function Users({ users }: UsersProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+    const [deleteUserId, setDeleteUserId] = useState<{ id: number; name: string } | null>(null);
 
     const formatDate = (dateStr: string) => {
         return new Date(dateStr).toLocaleDateString('en-US', {
@@ -215,11 +216,7 @@ export default function Users({ users }: UsersProps) {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8 text-destructive hover:text-destructive"
-                                                        onClick={() => {
-                                                            if (confirm(`Delete user ${user.name}?`)) {
-                                                                router.delete(`/admin/user/${user.id}`);
-                                                            }
-                                                        }}
+                                                        onClick={() => setDeleteUserId({ id: user.id, name: user.name })}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -260,6 +257,30 @@ export default function Users({ users }: UsersProps) {
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
             />
+
+            <Dialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete User</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete {deleteUserId?.name}? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteUserId(null)}>Cancel</Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                if (deleteUserId) router.delete(`/admin/user/${deleteUserId.id}`);
+                                setDeleteUserId(null);
+                            }}
+                        >
+                            <Trash2 className="mr-1.5 h-4 w-4" />
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

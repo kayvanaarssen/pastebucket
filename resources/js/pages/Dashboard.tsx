@@ -3,7 +3,9 @@ import AppLayout from '@/layouts/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Eye, Trash2, ExternalLink, Clock, Globe, Link2, EyeOff, Lock, Flame, Plus, Code2 } from 'lucide-react';
+import { useState } from 'react';
 import type { PaginatedData, PageProps } from '@/types';
 
 interface DashboardPaste {
@@ -24,6 +26,8 @@ interface DashboardProps extends PageProps {
 }
 
 export default function Dashboard({ pastes }: DashboardProps) {
+    const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
+
     const formatDate = (dateStr: string) => {
         return new Date(dateStr).toLocaleDateString('en-US', {
             month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -114,11 +118,7 @@ export default function Dashboard({ pastes }: DashboardProps) {
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8 text-destructive hover:text-destructive"
-                                            onClick={() => {
-                                                if (confirm('Delete this paste?')) {
-                                                    router.delete(`/p/${paste.slug}`);
-                                                }
-                                            }}
+                                            onClick={() => setDeleteSlug(paste.slug)}
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -151,6 +151,30 @@ export default function Dashboard({ pastes }: DashboardProps) {
                 )}
 
             </div>
+
+            <Dialog open={!!deleteSlug} onOpenChange={() => setDeleteSlug(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Paste</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this paste? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteSlug(null)}>Cancel</Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                if (deleteSlug) router.delete(`/p/${deleteSlug}`);
+                                setDeleteSlug(null);
+                            }}
+                        >
+                            <Trash2 className="mr-1.5 h-4 w-4" />
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
