@@ -124,7 +124,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                 {/* Options bar */}
                 <Card>
                     <CardContent className="flex flex-wrap items-end gap-x-3 gap-y-2 p-3">
-                        <div className="space-y-1">
+                        <div className="flex flex-col gap-1">
                             <Label className="text-xs flex items-center gap-1">
                                 <Code2 className="h-3 w-3" />
                                 Language
@@ -133,7 +133,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 value={data.language}
                                 onValueChange={v => setData('language', v === 'auto' ? '' : v)}
                             >
-                                <SelectTrigger className="h-8 w-[130px] text-xs">
+                                <SelectTrigger className="w-[130px] text-xs">
                                     <SelectValue placeholder="Auto-detect" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -146,7 +146,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-1">
+                        <div className="flex flex-col gap-1">
                             <Label className="text-xs flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
                                 Expires
@@ -155,7 +155,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 value={String(data.expiry_hours)}
                                 onValueChange={v => setData('expiry_hours', Number(v))}
                             >
-                                <SelectTrigger className="h-8 w-[100px] text-xs">
+                                <SelectTrigger className="w-[100px] text-xs">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -167,7 +167,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-1">
+                        <div className="flex flex-col gap-1">
                             <Label className="text-xs flex items-center gap-1">
                                 <Globe className="h-3 w-3" />
                                 Visibility
@@ -176,7 +176,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 value={data.visibility}
                                 onValueChange={v => setData('visibility', v as 'public' | 'unlisted' | 'private')}
                             >
-                                <SelectTrigger className="h-8 w-[115px] text-xs">
+                                <SelectTrigger className="w-[115px] text-xs">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -201,7 +201,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-1">
+                        <div className="flex flex-col gap-1">
                             <Label className="text-xs flex items-center gap-1">
                                 <Lock className="h-3 w-3" />
                                 Password
@@ -211,7 +211,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 placeholder="Optional"
                                 value={data.password}
                                 onChange={e => setData('password', e.target.value)}
-                                className="h-8 w-[140px] text-xs py-0"
+                                className="w-[140px] text-xs md:text-xs"
                             />
                         </div>
                         <div className="flex flex-col items-center gap-1">
@@ -219,7 +219,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                                 <Flame className="h-3 w-3 text-orange-500" />
                                 Burn
                             </Label>
-                            <div className="flex h-8 items-center">
+                            <div className="flex h-9 items-center">
                                 <Switch
                                     checked={data.burn_after_read}
                                     onCheckedChange={v => setData('burn_after_read', v)}
