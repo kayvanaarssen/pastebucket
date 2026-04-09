@@ -33,7 +33,7 @@ interface AdminDashboardProps extends PageProps {
 }
 
 export default function AdminDashboard({ pastes, stats, search }: AdminDashboardProps) {
-    const [deletePasteId, setDeletePasteId] = useState<number | null>(null);
+    const [deletePasteSlug, setDeletePasteSlug] = useState<string | null>(null);
     const searchForm = useForm({ search: search || '' });
 
     const handleSearch = (e: React.FormEvent) => {
@@ -162,7 +162,7 @@ export default function AdminDashboard({ pastes, stats, search }: AdminDashboard
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8 text-destructive hover:text-destructive"
-                                                        onClick={() => setDeletePasteId(paste.id)}
+                                                        onClick={() => setDeletePasteSlug(paste.slug)}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -198,7 +198,7 @@ export default function AdminDashboard({ pastes, stats, search }: AdminDashboard
                 )}
             </div>
 
-            <Dialog open={!!deletePasteId} onOpenChange={() => setDeletePasteId(null)}>
+            <Dialog open={!!deletePasteSlug} onOpenChange={() => setDeletePasteSlug(null)}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Delete Paste</DialogTitle>
@@ -207,12 +207,12 @@ export default function AdminDashboard({ pastes, stats, search }: AdminDashboard
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeletePasteId(null)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setDeletePasteSlug(null)}>Cancel</Button>
                         <Button
                             variant="destructive"
                             onClick={() => {
-                                if (deletePasteId) router.delete(`/admin/paste/${deletePasteId}`);
-                                setDeletePasteId(null);
+                                if (deletePasteSlug) router.delete(`/admin/paste/${deletePasteSlug}`);
+                                setDeletePasteSlug(null);
                             }}
                         >
                             <Trash2 className="mr-1.5 h-4 w-4" />
