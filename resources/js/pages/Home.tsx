@@ -9,7 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { languages, detectLanguage } from '@/lib/languages';
 import { getExpiryOptions } from '@/lib/expiry';
-import { Lock, EyeOff, Globe, Link2, Flame, Code2, Clock } from 'lucide-react';
+import { CodeHighlighter } from '@/components/CodeHighlighter';
+import { Lock, EyeOff, Globe, Link2, Flame, Code2, Clock, Eye } from 'lucide-react';
 import type { PageProps } from '@/types';
 
 interface HomeProps extends PageProps {
@@ -31,6 +32,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [autoDetected, setAutoDetected] = useState<string | null>(null);
+    const [showPreview, setShowPreview] = useState(false);
     const detectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const expiryOptions = getExpiryOptions(maxExpiry);
@@ -101,23 +103,44 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                     )}
                 </div>
 
-                {/* Textarea */}
-                <div className="relative">
-                    <textarea
-                        ref={textareaRef}
-                        value={data.content}
-                        onChange={e => handleContentChange(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Paste your code here..."
-                        className="min-h-[200px] sm:min-h-[300px] w-full resize-y rounded-lg border bg-card p-3 sm:p-4 font-mono text-sm leading-relaxed text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring overflow-auto"
-                        spellCheck={false}
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        style={{ tabSize: 4 }}
-                    />
+                {/* Textarea / Preview */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-end">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowPreview(!showPreview)}
+                            disabled={!data.content.trim()}
+                            className="text-xs"
+                        >
+                            {showPreview ? <EyeOff className="mr-1.5 h-3.5 w-3.5" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
+                            {showPreview ? 'Edit' : 'Preview'}
+                        </Button>
+                    </div>
+                    {showPreview && data.content.trim() ? (
+                        <div className="overflow-x-auto rounded-lg border min-h-[200px] sm:min-h-[300px]">
+                            <CodeHighlighter code={data.content} language={effectiveLanguage || 'text'} />
+                        </div>
+                    ) : (
+                        <div className="relative">
+                            <textarea
+                                ref={textareaRef}
+                                value={data.content}
+                                onChange={e => handleContentChange(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Paste your code here..."
+                                className="min-h-[200px] sm:min-h-[300px] w-full resize-y rounded-lg border bg-card p-3 sm:p-4 font-mono text-sm leading-relaxed text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring overflow-auto"
+                                spellCheck={false}
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                style={{ tabSize: 4 }}
+                            />
+                        </div>
+                    )}
                     {errors.content && (
-                        <p className="mt-1 text-sm text-destructive">{errors.content}</p>
+                        <p className="text-sm text-destructive">{errors.content}</p>
                     )}
                 </div>
 
