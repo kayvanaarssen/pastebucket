@@ -5,7 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Trash2, Users, FileText, Activity, TrendingUp, Search, ExternalLink } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Trash2, Users, FileText, Activity, TrendingUp, Search, ExternalLink, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import type { PaginatedData, PageProps } from '@/types';
 
@@ -30,10 +33,15 @@ interface AdminDashboardProps extends PageProps {
         pastes_today: number;
     };
     search: string | null;
+    registration: {
+        enabled: boolean;
+        until: string | null;
+    };
 }
 
-export default function AdminDashboard({ pastes, stats, search }: AdminDashboardProps) {
+export default function AdminDashboard({ pastes, stats, search, registration }: AdminDashboardProps) {
     const [deletePasteSlug, setDeletePasteSlug] = useState<string | null>(null);
+    const [regDuration, setRegDuration] = useState<string>('');
     const searchForm = useForm({ search: search || '' });
 
     const handleSearch = (e: React.FormEvent) => {
@@ -102,6 +110,81 @@ export default function AdminDashboard({ pastes, stats, search }: AdminDashboard
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Registration Control */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <UserPlus className="h-5 w-5" />
+                                Registration
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                {registration.enabled ? (
+                                    registration.until ? (
+                                        <>Open until {new Date(registration.until).toLocaleString()}</>
+                                    ) : (
+                                        'Open indefinitely'
+                                    )
+                                ) : (
+                                    'Currently disabled'
+                                )}
+                            </p>
+                        </div>
+                        <Badge variant={registration.enabled ? 'default' : 'secondary'}>
+                            {registration.enabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-wrap items-end gap-3">
+                            {registration.enabled ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => router.post('/admin/registration', { enabled: false, duration: null })}
+                                >
+                                    Disable Registration
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button
+                                        onClick={() => router.post('/admin/registration', { enabled: true, duration: null })}
+                                    >
+                                        Enable Permanently
+                                    </Button>
+                                    <div className="flex items-end gap-2">
+                                        <div className="flex flex-col gap-1">
+                                            <Label className="text-xs">Duration</Label>
+                                            <Select value={regDuration} onValueChange={setRegDuration}>
+                                                <SelectTrigger className="w-[160px]">
+                                                    <SelectValue placeholder="Select duration" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="15">15 minutes</SelectItem>
+                                                    <SelectItem value="30">30 minutes</SelectItem>
+                                                    <SelectItem value="60">1 hour</SelectItem>
+                                                    <SelectItem value="120">2 hours</SelectItem>
+                                                    <SelectItem value="360">6 hours</SelectItem>
+                                                    <SelectItem value="720">12 hours</SelectItem>
+                                                    <SelectItem value="1440">24 hours</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <Button
+                                            variant="secondary"
+                                            disabled={!regDuration}
+                                            onClick={() => {
+                                                router.post('/admin/registration', { enabled: true, duration: parseInt(regDuration) });
+                                                setRegDuration('');
+                                            }}
+                                        >
+                                            Enable Temporarily
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Search */}
                 <form onSubmit={handleSearch} className="flex gap-2">

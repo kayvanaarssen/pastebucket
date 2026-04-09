@@ -41,6 +41,7 @@ export interface PageProps {
     auth: {
         user: User | null;
     };
+    registration_enabled: boolean;
     flash: {
         success: string | null;
         error: string | null;

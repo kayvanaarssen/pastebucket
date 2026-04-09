@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Paste;
+use App\Models\Setting;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -35,6 +37,10 @@ class AdminController extends Controller
             'pastes' => $pastes,
             'stats' => $stats,
             'search' => $search,
+            'registration' => [
+                'enabled' => Setting::registrationEnabled(),
+                'until' => Setting::registrationUntil(),
+            ],
         ]);
     }
 
@@ -111,5 +117,28 @@ class AdminController extends Controller
             'role' => $user->isAdmin() ? 'user' : 'admin',
         ]);
         return back()->with('success', 'User role updated.');
+    }
+
+    public function updateRegistration(Request $request)
+    {
+        $validated = $request->validate([
+            'enabled' => 'required|boolean',
+            'duration' => 'nullable|integer|min:1',
+        ]);
+
+        Setting::set('registration_enabled', $validated['enabled'] ? 'true' : 'false');
+
+        if ($validated['enabled'] && $validated['duration']) {
+            Setting::set('registration_until', Carbon::now()->addMinutes($validated['duration'])->toISOString());
+        } else {
+            Setting::set('registration_until', null);
+        }
+
+        $message = $validated['enabled'] ? 'Registration enabled.' : 'Registration disabled.';
+        if ($validated['enabled'] && $validated['duration']) {
+            $message = "Registration enabled for {$validated['duration']} minutes.";
+        }
+
+        return back()->with('success', $message);
     }
 }
