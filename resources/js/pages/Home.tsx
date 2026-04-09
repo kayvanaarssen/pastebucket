@@ -10,7 +10,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { languages, detectLanguage } from '@/lib/languages';
 import { getExpiryOptions } from '@/lib/expiry';
 import { CodeHighlighter } from '@/components/CodeHighlighter';
-import { Lock, EyeOff, Globe, Link2, Flame, Code2, Clock, Eye } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Lock, EyeOff, Globe, Link2, Flame, Code2, Clock, Eye, Info } from 'lucide-react';
 import type { PageProps } from '@/types';
 
 interface HomeProps extends PageProps {
@@ -239,6 +240,16 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                             <Label className="text-xs flex items-center gap-1">
                                 <Flame className="h-3 w-3 text-orange-500" />
                                 Burn
+                                <TooltipProvider delayDuration={300}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-[200px] text-center">
+                                            Paste will be deleted after being viewed once
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </Label>
                             <div className="flex h-9 items-center">
                                 <Switch
