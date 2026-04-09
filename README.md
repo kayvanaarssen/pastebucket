@@ -116,7 +116,7 @@ npm run dev
 Replace the default deploy script with:
 
 ```bash
-cd /home/ploi/{site-folder}
+cd {SITE_DIRECTORY}
 git pull origin main
 
 composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
@@ -129,7 +129,7 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-echo "Deployed successfully"
+echo "Application deployed!"
 ```
 
 ### 4. Environment Variables
@@ -161,7 +161,7 @@ PASTE_CLEANUP_ENABLED=true
 SSH into your server (or use Ploi's **Terminal**) and run:
 
 ```bash
-cd /home/ploi/{site-folder}
+cd {SITE_DIRECTORY}
 php artisan make:admin "Admin" "admin@example.com" "your-secure-password"
 ```
 
@@ -170,13 +170,13 @@ php artisan make:admin "Admin" "admin@example.com" "your-secure-password"
 In Ploi's **Cronjobs** tab, add:
 
 ```
-* * * * * cd /home/ploi/{site-folder} && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd {SITE_DIRECTORY} && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Or add a specific cron for paste cleanup:
 
 ```
-0 * * * * cd /home/ploi/{site-folder} && php artisan pastes:clean >> /dev/null 2>&1
+0 * * * * cd {SITE_DIRECTORY} && php artisan pastes:clean >> /dev/null 2>&1
 ```
 
 ### 7. SSL
