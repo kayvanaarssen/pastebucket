@@ -1,4 +1,5 @@
-import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
+import type { PageProps } from '@/types';
 import AppLayout from '@/layouts/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { useState } from 'react';
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 
 export default function Login() {
+    const { registration_enabled } = usePage<PageProps>().props;
     const { data, setData, post, processing, errors } = useForm({
         email: '',
         password: '',
@@ -137,14 +139,16 @@ export default function Login() {
                             </Button>
                         </form>
                     </CardContent>
-                    <CardFooter className="justify-center">
-                        <p className="text-sm text-muted-foreground">
-                            Don't have an account?{' '}
-                            <Link href="/register" className="text-primary hover:underline">
-                                Register
-                            </Link>
-                        </p>
-                    </CardFooter>
+                    {registration_enabled && (
+                        <CardFooter className="justify-center">
+                            <p className="text-sm text-muted-foreground">
+                                Don't have an account?{' '}
+                                <Link href="/register" className="text-primary hover:underline">
+                                    Register
+                                </Link>
+                            </p>
+                        </CardFooter>
+                    )}
                 </Card>
             </div>
         </AppLayout>

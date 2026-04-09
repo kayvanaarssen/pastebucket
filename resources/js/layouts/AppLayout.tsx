@@ -20,7 +20,7 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children, title }: AppLayoutProps) {
-    const { auth, flash } = usePage<PageProps>().props;
+    const { auth, flash, registration_enabled } = usePage<PageProps>().props;
     const { setTheme, resolvedTheme } = useTheme();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -139,9 +139,11 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                                 <Button variant="ghost" size="sm" asChild>
                                     <Link href="/login">Login</Link>
                                 </Button>
-                                <Button size="sm" asChild>
-                                    <Link href="/register">Register</Link>
-                                </Button>
+                                {registration_enabled && (
+                                    <Button size="sm" asChild>
+                                        <Link href="/register">Register</Link>
+                                    </Button>
+                                )}
                             </div>
                         )}
 
@@ -211,9 +213,11 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                                     <Button variant="ghost" size="sm" className="justify-start" asChild>
                                         <Link href="/login" onClick={() => setMobileMenuOpen(false)}>Login</Link>
                                     </Button>
-                                    <Button size="sm" className="justify-start" asChild>
-                                        <Link href="/register" onClick={() => setMobileMenuOpen(false)}>Register</Link>
-                                    </Button>
+                                    {registration_enabled && (
+                                        <Button size="sm" className="justify-start" asChild>
+                                            <Link href="/register" onClick={() => setMobileMenuOpen(false)}>Register</Link>
+                                        </Button>
+                                    )}
                                 </>
                             )}
                         </nav>

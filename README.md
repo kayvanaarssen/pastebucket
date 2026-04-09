@@ -22,7 +22,8 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 - **Visibility Controls** - Public, unlisted, or private (login required) pastes.
 - **Secure URLs** - 16-character random slugs for unpredictable paste URLs.
 - **No Character Limit** - Designed for sharing long code snippets with preserved structure.
-- **Admin Panel** - Dashboard with stats, paste management, user management (create/edit/delete), and role toggling.
+- **Registration Control** - Registration disabled by default. Enable permanently or temporarily (15 min to 24 hours) from the admin panel. Auto-disables when the window expires.
+- **Admin Panel** - Dashboard with stats, paste management, user management (create/edit/delete), registration control, and role toggling.
 - **Responsive Design** - Fully responsive layout for mobile, tablet, and desktop.
 - **Tab Support** - Tab key inserts actual tab characters in the editor.
 - **Passkey Authentication** - Sign in with Face ID, Touch ID, or Windows Hello via WebAuthn. Manage passkeys from the dashboard.
@@ -211,6 +212,9 @@ php artisan make:admin {name} {email} {password}
 
 # Clean up expired pastes
 php artisan pastes:clean
+
+# Check and disable expired registration windows
+php artisan registration:check
 ```
 
 ## License

@@ -2,6 +2,24 @@
 
 All notable changes to PasteBucket will be documented in this file.
 
+## [1.1.0] - 2026-04-09
+
+### Added
+
+- **Registration control** — registration is now disabled by default
+- Admin panel toggle to enable/disable registration permanently or for a set duration (15 min to 24 hours)
+- Registration auto-disables when the temporary window expires via Laravel scheduler
+- New `registration:check` artisan command for scheduled registration expiry
+- `settings` database table for persistent application settings
+- Register links and buttons are hidden site-wide when registration is disabled
+- Visiting `/register` directly redirects to login with an error when disabled
+
+### Technical
+
+- New `Setting` model with cache-backed key-value store
+- `registration_enabled` shared via Inertia props to all pages
+- Laravel scheduler configured in `routes/console.php` for both registration expiry and paste cleanup
+
 ## [1.0.1] - 2026-04-09
 
 ### Added

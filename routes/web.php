@@ -47,6 +47,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/user/{user}', [AdminController::class, 'updateUser'])->name('user.update');
         Route::delete('/user/{user}', [AdminController::class, 'destroyUser'])->name('user.destroy');
         Route::post('/user/{user}/toggle-admin', [AdminController::class, 'toggleAdmin'])->name('user.toggle-admin');
+        Route::post('/registration', [AdminController::class, 'updateRegistration'])->name('registration.update');
     });
 });
 
