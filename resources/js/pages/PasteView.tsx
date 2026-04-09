@@ -3,9 +3,9 @@ import AppLayout from '@/layouts/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import vscDarkPlus from 'react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus';
-import oneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import vs2015 from 'react-syntax-highlighter/dist/esm/styles/hljs/vs2015';
+import atomOneLight from 'react-syntax-highlighter/dist/esm/styles/hljs/atom-one-light';
 import { useTheme } from '@/components/ThemeProvider';
 import { Copy, Check, Trash2, ExternalLink, Clock, Eye, Lock, Flame, Globe, Link2, EyeOff, Code2, FileText } from 'lucide-react';
 import { useState } from 'react';
@@ -146,7 +146,7 @@ export default function PasteView({ paste }: PasteViewProps) {
                     <SyntaxHighlighter
                         key={resolvedTheme}
                         language={paste.language || 'text'}
-                        style={resolvedTheme === 'dark' ? vscDarkPlus : oneLight}
+                        style={resolvedTheme === 'dark' ? vs2015 : atomOneLight}
                         showLineNumbers
                         wrapLongLines
                         customStyle={{
