@@ -1,6 +1,14 @@
 # PasteBucket
 
+[![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
 A self-hosted pastebin alternative built with Laravel and React. Share code snippets with syntax highlighting, password protection, expiry controls, and more.
+
+> **Disclaimer:** This software is provided "as is", without warranty of any kind. Use at your own risk. The authors are not responsible for any data loss, security breaches, or other damages resulting from the use of this software. Always review the code and configure proper security measures before deploying to production.
 
 ![PasteBucket Home](screenshots/home-light.png)
 
@@ -17,6 +25,7 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 - **Admin Panel** - Dashboard with stats, paste management, user management (create/edit/delete), and role toggling.
 - **Responsive Design** - Fully responsive layout for mobile, tablet, and desktop.
 - **Tab Support** - Tab key inserts actual tab characters in the editor.
+- **Passkey Authentication** - Sign in with Face ID, Touch ID, or Windows Hello via WebAuthn. Manage passkeys from the dashboard.
 - **Raw View** - Access raw paste content at `/p/{slug}/raw`.
 
 ## Screenshots
@@ -206,4 +215,6 @@ php artisan pastes:clean
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+**USE AT YOUR OWN RISK.** The authors assume no liability for any damages or issues arising from the use of this software.
