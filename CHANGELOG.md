@@ -2,6 +2,12 @@
 
 All notable changes to PasteBucket will be documented in this file.
 
+## [1.1.1] - 2026-04-09
+
+### Added
+
+- **Passkey autofill** — login page now triggers WebAuthn conditional UI so password managers (1Password, browser built-in) automatically offer passkeys in the email field autofill dropdown
+
 ## [1.1.0] - 2026-04-09
 
 ### Added
