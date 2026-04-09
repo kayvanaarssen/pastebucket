@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Fingerprint } from 'lucide-react';
-import { useState } from 'react';
-import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
+import { useState, useEffect, useRef } from 'react';
+import { startAuthentication, browserSupportsWebAuthn, browserSupportsWebAuthnAutofill } from '@simplewebauthn/browser';
 
 export default function Login() {
     const { registration_enabled } = usePage<PageProps>().props;
@@ -20,6 +20,66 @@ export default function Login() {
     });
     const [passkeyLoading, setPasskeyLoading] = useState(false);
     const [passkeyError, setPasskeyError] = useState<string | null>(null);
+    const conditionalAbort = useRef<AbortController | null>(null);
+
+    const verifyPasskey = async (credential: any) => {
+        const verifyRes = await fetch('/passkey/authenticate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
+            },
+            body: JSON.stringify({ credential }),
+        });
+
+        const result = await verifyRes.json();
+        if (verifyRes.ok && result.redirect) {
+            router.visit(result.redirect);
+        } else {
+            setPasskeyError(result.error || 'Authentication failed.');
+        }
+    };
+
+    // Conditional UI: trigger passkey autofill on page load
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        let cancelled = false;
+
+        (async () => {
+            const supported = await browserSupportsWebAuthnAutofill();
+            if (!supported || cancelled) return;
+
+            try {
+                const optionsRes = await fetch('/passkey/authenticate/options', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
+                    },
+                });
+                if (!optionsRes.ok || cancelled) return;
+                const options = await optionsRes.json();
+
+                conditionalAbort.current = new AbortController();
+                const credential = await startAuthentication({
+                    optionsJSON: options,
+                    useBrowserAutofill: true,
+                });
+
+                if (!cancelled) {
+                    await verifyPasskey(credential);
+                }
+            } catch {
+                // Silently ignore — user may not have chosen a passkey from autofill
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            conditionalAbort.current?.abort();
+        };
+    }, []);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,6 +87,8 @@ export default function Login() {
     };
 
     const loginWithPasskey = async () => {
+        // Abort conditional UI if running, so it doesn't conflict
+        conditionalAbort.current?.abort();
         setPasskeyError(null);
         setPasskeyLoading(true);
         try {
@@ -40,22 +102,7 @@ export default function Login() {
             const options = await optionsRes.json();
 
             const credential = await startAuthentication({ optionsJSON: options });
-
-            const verifyRes = await fetch('/passkey/authenticate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
-                },
-                body: JSON.stringify({ credential }),
-            });
-
-            const result = await verifyRes.json();
-            if (verifyRes.ok && result.redirect) {
-                router.visit(result.redirect);
-            } else {
-                setPasskeyError(result.error || 'Authentication failed.');
-            }
+            await verifyPasskey(credential);
         } catch (err: any) {
             if (err.name === 'NotAllowedError') {
                 setPasskeyError('Authentication was cancelled.');
@@ -110,6 +157,7 @@ export default function Login() {
                                     value={data.email}
                                     onChange={e => setData('email', e.target.value)}
                                     placeholder="you@example.com"
+                                    autoComplete="username webauthn"
                                     autoFocus
                                 />
                                 {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
