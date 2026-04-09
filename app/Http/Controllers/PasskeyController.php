@@ -164,9 +164,16 @@ class PasskeyController extends Controller
             return response()->json(['error' => 'Origin verification failed.'], 422);
         }
 
-        // Find the passkey
-        $passkey = Passkey::where('credential_id', $credential['id'])->first();
+        // Find the passkey (normalize base64url padding for comparison)
+        $credentialId = rtrim($credential['id'], '=');
+        $passkey = Passkey::all()->first(function ($p) use ($credentialId) {
+            return rtrim($p->credential_id, '=') === $credentialId;
+        });
         if (!$passkey) {
+            \Log::error('Passkey not found', [
+                'sent_id' => $credential['id'],
+                'stored_ids' => Passkey::pluck('credential_id')->toArray(),
+            ]);
             return response()->json(['error' => 'Passkey not found.'], 422);
         }
 
