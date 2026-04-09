@@ -2,6 +2,16 @@
 
 All notable changes to PasteBucket will be documented in this file.
 
+## [1.0.1] - 2026-04-09
+
+### Added
+
+- Info tooltip on Burn option explaining burn-after-read behavior
+
+### Fixed
+
+- Admin paste delete returning 404 (was sending paste ID instead of slug for route model binding)
+
 ## [1.0.0] - 2026-04-09
 
 ### Added
