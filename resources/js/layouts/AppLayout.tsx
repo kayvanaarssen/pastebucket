@@ -248,6 +248,7 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
             <footer className="border-t py-4 sm:py-6">
                 <div className="mx-auto max-w-6xl px-4 text-center text-sm text-muted-foreground">
                     PasteBucket — Self-hosted code sharing
+                    <div className="mt-1">&copy; {new Date().getFullYear()} <a href="https://ictwebsolution.nl" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">ICTWebSolution B.V.</a></div>
                 </div>
             </footer>
         </div>
