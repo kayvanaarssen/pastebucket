@@ -2,6 +2,14 @@
 
 All notable changes to PasteBucket will be documented in this file.
 
+## [1.1.4] - 2026-04-14
+
+### Fixed
+
+- **Deleting users now works** — errors on the admin user delete endpoint were written to the validation error bag (`withErrors`) but the Inertia layout only reads `session('error')`, so the failure path was silent. Switched to `->with('error', ...)` so the flash banner shows.
+- Admins can now delete other admin accounts; only deleting your own account is blocked (the previous blanket "cannot delete admin users" rule was unnecessarily strict and the real footgun is self-delete).
+- Resend/expire invite errors now surface as flash messages instead of silently failing.
+
 ## [1.1.3] - 2026-04-14
 
 ### Added

@@ -115,17 +115,17 @@ class AdminController extends Controller
     public function resendInvite(UserInvite $invite)
     {
         if ($invite->used_at !== null) {
-            return back()->withErrors(['error' => 'This invite has already been used.']);
+            return back()->with('error', 'This invite has already been used.');
         }
 
         if ($invite->expires_at->isPast()) {
-            return back()->withErrors(['error' => 'This invite has expired. Revoke it and create a new one.']);
+            return back()->with('error', 'This invite has expired. Revoke it and create a new one.');
         }
 
         try {
             Mail::send(new InviteMail($invite->load('inviter')));
         } catch (\Throwable $e) {
-            return back()->withErrors(['error' => 'Failed to send email: ' . $e->getMessage()]);
+            return back()->with('error', 'Failed to send email: ' . $e->getMessage());
         }
 
         return back()->with('success', "Invite re-sent to {$invite->email}.");
@@ -184,10 +184,10 @@ class AdminController extends Controller
         return back()->with('success', 'Paste deleted.');
     }
 
-    public function destroyUser(User $user)
+    public function destroyUser(Request $request, User $user)
     {
-        if ($user->isAdmin()) {
-            return back()->withErrors(['error' => 'Cannot delete admin users.']);
+        if ($user->id === $request->user()->id) {
+            return back()->with('error', 'You cannot delete your own account.');
         }
         $user->delete();
         return back()->with('success', 'User deleted.');
