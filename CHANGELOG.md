@@ -2,6 +2,23 @@
 
 All notable changes to PasteBucket will be documented in this file.
 
+## [1.1.2] - 2026-04-14
+
+### Added
+
+- **User invites** — admins can create secure invite links from the user management page
+- Invitees choose their own name and password (and can add a passkey afterwards from their profile)
+- Pending invites list with copy-to-clipboard and revoke actions
+- Configurable invite expiry (1 hour to 30 days)
+- Stronger password policy for new users and invite acceptance: minimum 10 characters, mixed case, number, and symbol
+
+### Technical
+
+- New `user_invites` table and `UserInvite` model with token, role, expiration, and inviter tracking
+- New `InviteController` handling public invite acceptance at `/invite/{token}`
+- Password rules centralized via `Password::defaults()` in `AppServiceProvider`
+- New `Auth/AcceptInvite` and `Auth/InviteInvalid` Inertia pages
+
 ## [1.1.1] - 2026-04-09
 
 ### Added
