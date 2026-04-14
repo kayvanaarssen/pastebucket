@@ -23,7 +23,8 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 - **Secure URLs** - 16-character random slugs for unpredictable paste URLs.
 - **No Character Limit** - Designed for sharing long code snippets with preserved structure.
 - **Registration Control** - Registration disabled by default. Enable permanently or temporarily (15 min to 24 hours) from the admin panel. Auto-disables when the window expires.
-- **Admin Panel** - Dashboard with stats, paste management, user management (create/edit/delete), registration control, and role toggling.
+- **User Invites** - Admins can create secure, single-use invite links from the user management page. Invitees pick their own password (10+ chars, mixed case, number, symbol) and can add a passkey afterwards. Invites can be emailed automatically with a branded HTML template, copied manually, resent, or revoked. Configurable expiry from 1 hour to 30 days.
+- **Admin Panel** - Dashboard with stats, paste management, user management (create/edit/delete/invite), registration control, and role toggling.
 - **Responsive Design** - Fully responsive layout for mobile, tablet, and desktop.
 - **Tab Support** - Tab key inserts actual tab characters in the editor.
 - **Passkey Authentication** - Sign in with Face ID, Touch ID, or Windows Hello via WebAuthn. Manage passkeys from the dashboard.
@@ -164,6 +165,16 @@ PASTE_GUEST_MAX_EXPIRY_HOURS=168
 PASTE_USER_MAX_EXPIRY_HOURS=8760
 PASTE_DEFAULT_EXPIRY_HOURS=24
 PASTE_CLEANUP_ENABLED=true
+
+# Mail (required for invite emails — otherwise uncheck "Email invite link" when creating invites)
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.your-provider.com
+MAIL_PORT=587
+MAIL_USERNAME=your-smtp-user
+MAIL_PASSWORD=your-smtp-password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="noreply@your-domain.com"
+MAIL_FROM_NAME="${APP_NAME}"
 ```
 
 ### 5. Create Admin User
