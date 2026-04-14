@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InviteController;
 use App\Http\Controllers\PasskeyController;
 use App\Http\Controllers\PasteController;
 use App\Http\Controllers\ProfileController;
@@ -23,6 +24,10 @@ Route::middleware('guest')->group(function () {
     // Passkey authentication (guest)
     Route::post('/passkey/authenticate/options', [PasskeyController::class, 'authenticateOptions']);
     Route::post('/passkey/authenticate', [PasskeyController::class, 'authenticate']);
+
+    // Invite acceptance (public)
+    Route::get('/invite/{token}', [InviteController::class, 'show'])->name('invite.show');
+    Route::post('/invite/{token}', [InviteController::class, 'accept'])->name('invite.accept');
 });
 
 Route::middleware('auth')->group(function () {
@@ -48,6 +53,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/user/{user}', [AdminController::class, 'destroyUser'])->name('user.destroy');
         Route::post('/user/{user}/toggle-admin', [AdminController::class, 'toggleAdmin'])->name('user.toggle-admin');
         Route::post('/registration', [AdminController::class, 'updateRegistration'])->name('registration.update');
+        Route::post('/invite', [AdminController::class, 'storeInvite'])->name('invite.store');
+        Route::delete('/invite/{invite}', [AdminController::class, 'destroyInvite'])->name('invite.destroy');
     });
 });
 

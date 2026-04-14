@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Paste;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\UserInvite;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -50,9 +52,56 @@ class AdminController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(25);
 
+        $invites = UserInvite::with('inviter:id,name')
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($i) => [
+                'id' => $i->id,
+                'email' => $i->email,
+                'role' => $i->role,
+                'expires_at' => $i->expires_at->toISOString(),
+                'created_at' => $i->created_at->toISOString(),
+                'invited_by' => $i->inviter?->name,
+                'url' => url('/invite/' . $i->token),
+            ]);
+
         return Inertia::render('Admin/Users', [
             'users' => $users,
+            'invites' => $invites,
         ]);
+    }
+
+    public function storeInvite(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|max:255',
+            'role' => 'required|in:user,admin',
+            'expiry_hours' => 'required|integer|min:1|max:720',
+        ]);
+
+        if (User::where('email', $validated['email'])->exists()) {
+            return back()->withErrors(['email' => 'A user with this email already exists.']);
+        }
+
+        UserInvite::where('email', $validated['email'])->whereNull('used_at')->delete();
+
+        $invite = UserInvite::create([
+            'email' => $validated['email'],
+            'token' => Str::random(48),
+            'role' => $validated['role'],
+            'invited_by' => $request->user()->id,
+            'expires_at' => now()->addHours($validated['expiry_hours']),
+        ]);
+
+        return back()->with('success', 'Invite created: ' . url('/invite/' . $invite->token));
+    }
+
+    public function destroyInvite(UserInvite $invite)
+    {
+        $invite->delete();
+        return back()->with('success', 'Invite revoked.');
     }
 
     public function storeUser(Request $request)
