@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\InviteMail;
 use App\Models\Paste;
 use App\Models\Setting;
 use App\Models\User;
@@ -10,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
@@ -79,6 +81,7 @@ class AdminController extends Controller
             'email' => 'required|email|max:255',
             'role' => 'required|in:user,admin',
             'expiry_hours' => 'required|integer|min:1|max:720',
+            'send_email' => 'sometimes|boolean',
         ]);
 
         if (User::where('email', $validated['email'])->exists()) {
@@ -95,7 +98,37 @@ class AdminController extends Controller
             'expires_at' => now()->addHours($validated['expiry_hours']),
         ]);
 
-        return back()->with('success', 'Invite created: ' . url('/invite/' . $invite->token));
+        $message = 'Invite created: ' . url('/invite/' . $invite->token);
+
+        if ($request->boolean('send_email')) {
+            try {
+                Mail::send(new InviteMail($invite->load('inviter')));
+                $message = "Invite created and emailed to {$invite->email}.";
+            } catch (\Throwable $e) {
+                return back()->with('success', $message . ' (Email failed: ' . $e->getMessage() . ')');
+            }
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function resendInvite(UserInvite $invite)
+    {
+        if ($invite->used_at !== null) {
+            return back()->withErrors(['error' => 'This invite has already been used.']);
+        }
+
+        if ($invite->expires_at->isPast()) {
+            return back()->withErrors(['error' => 'This invite has expired. Revoke it and create a new one.']);
+        }
+
+        try {
+            Mail::send(new InviteMail($invite->load('inviter')));
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => 'Failed to send email: ' . $e->getMessage()]);
+        }
+
+        return back()->with('success', "Invite re-sent to {$invite->email}.");
     }
 
     public function destroyInvite(UserInvite $invite)

@@ -2,6 +2,21 @@
 
 All notable changes to PasteBucket will be documented in this file.
 
+## [1.1.3] - 2026-04-14
+
+### Added
+
+- **Branded invite emails** — invites can now be emailed to the recipient automatically
+- "Email invite link to user" checkbox in the Create Invite dialog (on by default)
+- **Resend invite email** action in the pending invites list
+- HTML email template with PasteBucket logo, branded colors, CTA button, copy-paste fallback link, expiration notice, and ICTWebSolution footer
+
+### Technical
+
+- New `App\Mail\InviteMail` Mailable with `resources/views/emails/invite.blade.php` template
+- New `resendInvite` admin endpoint at `POST /admin/invite/{invite}/resend`
+- Email sending failures are surfaced as flash errors without blocking invite creation
+
 ## [1.1.2] - 2026-04-14
 
 ### Added

@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Trash2, Shield, ShieldOff, Plus, Pencil, Mail, Copy, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Trash2, Shield, ShieldOff, Plus, Pencil, Mail, Copy, X, Send } from 'lucide-react';
 import { useState } from 'react';
 import type { PaginatedData, PageProps } from '@/types';
 import { Link } from '@inertiajs/react';
@@ -141,6 +142,7 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
         email: '',
         role: 'user' as 'user' | 'admin',
         expiry_hours: 48,
+        send_email: true,
     });
 
     const submit = (e: React.FormEvent) => {
@@ -208,6 +210,22 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
                             </SelectContent>
                         </Select>
                     </div>
+                    <div className="flex items-start gap-2 rounded-md border p-3">
+                        <Checkbox
+                            id="invite-send-email"
+                            checked={form.data.send_email}
+                            onCheckedChange={(v) => form.setData('send_email', v === true)}
+                            className="mt-0.5"
+                        />
+                        <div className="space-y-1 leading-none">
+                            <Label htmlFor="invite-send-email" className="cursor-pointer">
+                                Email invite link to user
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                Sends a branded invite email. You can still copy the link manually afterwards.
+                            </p>
+                        </div>
+                    </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button type="submit" disabled={form.processing}>
@@ -226,6 +244,7 @@ export default function Users({ users, invites }: UsersProps) {
     const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
     const [deleteUserId, setDeleteUserId] = useState<{ id: number; name: string } | null>(null);
     const [copiedId, setCopiedId] = useState<number | null>(null);
+    const [resendingId, setResendingId] = useState<number | null>(null);
 
     const copyInviteUrl = (invite: Invite) => {
         navigator.clipboard.writeText(invite.url);
@@ -308,6 +327,22 @@ export default function Users({ users, invites }: UsersProps) {
                                                             title="Copy invite link"
                                                         >
                                                             <Copy className={`h-4 w-4 ${copiedId === invite.id ? 'text-green-600' : ''}`} />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                            disabled={resendingId === invite.id}
+                                                            onClick={() => {
+                                                                setResendingId(invite.id);
+                                                                router.post(`/admin/invite/${invite.id}/resend`, {}, {
+                                                                    preserveScroll: true,
+                                                                    onFinish: () => setResendingId(null),
+                                                                });
+                                                            }}
+                                                            title="Resend invite email"
+                                                        >
+                                                            <Send className="h-4 w-4" />
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
