@@ -30,6 +30,7 @@
         "@radix-ui/react-tabs": "^1.1.13",
         "@radix-ui/react-tooltip": "^1.2.8",
         "@simplewebauthn/browser": "^13.3.0",
+        "@tailwindcss/typography": "^0.5.19",
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@types/react-syntax-highlighter": "^15.5.13",
@@ -41,7 +42,9 @@
         "postcss": "^8.5.12",
         "react": "^19.2.5",
         "react-dom": "^19.2.5",
+        "react-markdown": "^10.1.0",
         "react-syntax-highlighter": "^16.1.1",
+        "remark-gfm": "^4.0.1",
         "tailwind-merge": "^3.5.0"
     }
 }
