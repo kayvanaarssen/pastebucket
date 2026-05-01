@@ -143,7 +143,7 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
                             {effectiveLanguage === 'markdown' ? (
                                 <MarkdownPreview content={data.content} />
                             ) : (
-                                <CodeHighlighter code={data.content} language={effectiveLanguage || 'text'} />
+                                <CodeHighlighter code={data.content} language={effectiveLanguage || 'text'} showLineNumbers={false} />
                             )}
                         </div>
                     ) : (
