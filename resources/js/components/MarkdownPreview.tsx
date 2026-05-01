@@ -17,14 +17,14 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
                         </a>
                     ),
                     pre: ({ children }) => (
-                        <pre className="overflow-x-auto rounded-lg bg-muted p-4 text-sm">
+                        <pre className="overflow-x-auto rounded-lg bg-zinc-900 text-zinc-100 p-4 text-sm dark:bg-zinc-800">
                             {children}
                         </pre>
                     ),
                     code: ({ children, className, ...props }) => {
                         const isInline = !className;
                         return isInline ? (
-                            <code className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono" {...props}>
+                            <code className="rounded bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 text-sm font-mono text-foreground" {...props}>
                                 {children}
                             </code>
                         ) : (
