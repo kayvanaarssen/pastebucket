@@ -33,13 +33,18 @@ class PasteController extends Controller
             'language' => 'nullable|string|max:50',
             'password' => 'nullable|string|min:1',
             'visibility' => 'required|in:public,unlisted,private',
-            'expiry_hours' => "nullable|numeric|min:1|max:{$maxExpiry}",
+            'expiry_hours' => "nullable|numeric|min:0|max:{$maxExpiry}",
             'burn_after_read' => 'boolean',
         ]);
 
         // Only logged-in users can create private pastes
         if ($validated['visibility'] === 'private' && !auth()->check()) {
             $validated['visibility'] = 'unlisted';
+        }
+
+        // Only logged-in users can create non-expiring pastes
+        if (empty($validated['expiry_hours']) && !auth()->check()) {
+            $validated['expiry_hours'] = config('pastebucket.default_expiry_hours', 24);
         }
 
         $slug = $this->generateUniqueSlug();

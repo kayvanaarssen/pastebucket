@@ -37,7 +37,7 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
     const [showPreview, setShowPreview] = useState(false);
     const detectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const expiryOptions = getExpiryOptions(maxExpiry);
+    const expiryOptions = getExpiryOptions(maxExpiry, isAuthenticated);
 
     const handleContentChange = useCallback((value: string) => {
         setData('content', value);
