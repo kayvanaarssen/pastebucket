@@ -1,6 +1,6 @@
 import type { ExpiryOption } from '@/types';
 
-export function getExpiryOptions(maxHours: number): ExpiryOption[] {
+export function getExpiryOptions(maxHours: number, isAuthenticated: boolean = false): ExpiryOption[] {
     const allOptions: ExpiryOption[] = [
         { label: '1 Hour', value: 1 },
         { label: '2 Hours', value: 2 },
@@ -18,5 +18,9 @@ export function getExpiryOptions(maxHours: number): ExpiryOption[] {
         { label: '180 Days', value: 4320 },
         { label: '365 Days', value: 8760 },
     ];
-    return allOptions.filter(o => o.value <= maxHours);
+    const options = allOptions.filter(o => o.value <= maxHours);
+    if (isAuthenticated) {
+        options.push({ label: 'Never', value: 0 });
+    }
+    return options;
 }
