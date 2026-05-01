@@ -40,4 +40,14 @@ class Setting extends Model
     {
         return static::get('registration_until');
     }
+
+    public static function footerCopyright(): string
+    {
+        return static::get('footer_copyright', 'ICTWebSolution B.V.');
+    }
+
+    public static function footerUrl(): string
+    {
+        return static::get('footer_url', 'https://ictwebsolution.nl');
+    }
 }

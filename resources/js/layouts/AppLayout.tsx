@@ -20,7 +20,7 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children, title }: AppLayoutProps) {
-    const { auth, flash, registration_enabled } = usePage<PageProps>().props;
+    const { auth, flash, registration_enabled, footer } = usePage<PageProps>().props;
     const { setTheme, resolvedTheme } = useTheme();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -249,7 +249,7 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                 <div className="mx-auto max-w-6xl px-4 text-center text-sm text-muted-foreground flex flex-wrap items-center justify-center gap-x-1">
                     <span>PasteBucket — Self-hosted code sharing</span>
                     <span className="hidden sm:inline">&middot;</span>
-                    <span>&copy; {new Date().getFullYear()} <a href="https://ictwebsolution.nl" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">ICTWebSolution B.V.</a></span>
+                    <span>&copy; {new Date().getFullYear()} {footer.url ? <a href={footer.url} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">{footer.copyright}</a> : footer.copyright}</span>
                 </div>
             </footer>
         </div>

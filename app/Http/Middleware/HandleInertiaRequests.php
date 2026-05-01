@@ -48,6 +48,10 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
             ],
             'registration_enabled' => fn () => Setting::registrationEnabled(),
+            'footer' => fn () => [
+                'copyright' => Setting::footerCopyright(),
+                'url' => Setting::footerUrl(),
+            ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

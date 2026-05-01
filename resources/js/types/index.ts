@@ -42,6 +42,10 @@ export interface PageProps {
         user: User | null;
     };
     registration_enabled: boolean;
+    footer: {
+        copyright: string;
+        url: string;
+    };
     flash: {
         success: string | null;
         error: string | null;
