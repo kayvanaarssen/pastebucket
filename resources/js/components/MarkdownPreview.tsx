@@ -26,13 +26,13 @@ function CodeBlock({ children }: { children: ReactNode }) {
     };
 
     return (
-        <div className="group relative">
-            <pre className="overflow-x-auto rounded-lg bg-zinc-900 text-zinc-100 p-4 text-[0.9rem] leading-relaxed dark:bg-zinc-800">
+        <div className="not-prose relative">
+            <pre className="overflow-x-auto rounded-lg bg-zinc-900 text-zinc-100 p-4 pr-12 text-[0.95rem] leading-relaxed dark:bg-zinc-800 font-mono">
                 {children}
             </pre>
             <button
                 onClick={copyCode}
-                className="absolute top-2.5 right-2.5 p-1.5 rounded-md bg-zinc-700/60 hover:bg-zinc-600 text-zinc-300 hover:text-zinc-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-2.5 right-2.5 p-1.5 rounded-md bg-white/20 hover:bg-white/30 text-white transition-colors"
                 title="Copy code"
             >
                 {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
