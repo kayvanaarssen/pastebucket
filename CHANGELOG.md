@@ -2,6 +2,33 @@
 
 All notable changes to PasteBucket will be documented in this file.
 
+## [1.2.0] - 2026-05-01
+
+### Added
+
+- **Paste editing** — logged-in users can now edit their own pastes (content, title, language, visibility, expiry, burn-after-read, and password)
+- Edit button on paste view page (visible to paste owner only)
+- Dedicated edit page with the same editor UI as paste creation
+- Password removal support when editing a paste
+- **Never-expire option** — logged-in users can set paste expiry to "Never" so pastes persist indefinitely
+- **Markdown preview** — formatted markdown rendering with GFM support (tables, strikethrough, task lists) on paste creation, editing, and viewing
+- Source/Formatted toggle on paste view for markdown pastes
+- Copy button on markdown code blocks with dark background for readability
+- **Auto-copy URL** — paste URL is automatically copied to clipboard on creation
+- Copy URL button on paste view page
+- **Configurable footer copyright** — admin settings panel for company name and URL in the site footer
+
+### Fixed
+
+- Code block contrast in markdown preview — switched to dark background with light text for readability
+- Code block copy button visibility — always visible with white-on-dark styling instead of unreliable hover
+- Code display uses horizontal scrolling instead of wrapping, preventing long single-line commands from appearing malformed
+- Preview mode on create/edit pages no longer shows line numbers
+
+### Dependencies
+
+- Bumped follow-redirects to 1.16.0, postcss to 8.5.12, axios to 1.15.2
+
 ## [1.1.4] - 2026-04-14
 
 ### Fixed
