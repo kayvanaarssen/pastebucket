@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { CodeHighlighter } from '@/components/CodeHighlighter';
 import { MarkdownPreview } from '@/components/MarkdownPreview';
-import { Copy, Check, Trash2, ExternalLink, Clock, Eye, Lock, Flame, Globe, Link2, EyeOff, Code2, FileText, LinkIcon, BookOpen } from 'lucide-react';
+import { Copy, Check, Trash2, ExternalLink, Clock, Eye, Lock, Flame, Globe, Link2, EyeOff, Code2, FileText, LinkIcon, BookOpen, Pencil } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
 import type { Paste, PageProps } from '@/types';
@@ -154,15 +154,23 @@ export default function PasteView({ paste }: PasteViewProps) {
                             </Button>
                         )}
                         {paste.is_owner && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                                onClick={() => setDeleteOpen(true)}
-                            >
-                                <Trash2 className="mr-1.5 h-4 w-4" />
-                                Delete
-                            </Button>
+                            <>
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/p/${paste.slug}/edit`}>
+                                        <Pencil className="mr-1.5 h-4 w-4" />
+                                        Edit
+                                    </Link>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                    onClick={() => setDeleteOpen(true)}
+                                >
+                                    <Trash2 className="mr-1.5 h-4 w-4" />
+                                    Delete
+                                </Button>
+                            </>
                         )}
                     </div>
                 </div>

@@ -64,4 +64,6 @@ Route::middleware('auth')->group(function () {
 Route::get('/p/{slug}', [PasteController::class, 'show'])->name('paste.show');
 Route::post('/p/{slug}/verify', [PasteController::class, 'verifyPassword'])->name('paste.verify');
 Route::get('/p/{slug}/raw', [PasteController::class, 'showRaw'])->name('paste.raw');
+Route::get('/p/{slug}/edit', [PasteController::class, 'edit'])->name('paste.edit')->middleware('auth');
+Route::put('/p/{slug}', [PasteController::class, 'update'])->name('paste.update')->middleware('auth');
 Route::delete('/p/{slug}', [PasteController::class, 'destroy'])->name('paste.destroy')->middleware('auth');
