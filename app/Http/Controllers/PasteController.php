@@ -148,6 +148,97 @@ class PasteController extends Controller
         return response($paste->content, 200)->header('Content-Type', 'text/plain');
     }
 
+    public function edit(string $slug)
+    {
+        $paste = Paste::where('slug', $slug)->firstOrFail();
+
+        if (auth()->id() !== $paste->user_id) {
+            abort(403, 'You can only edit your own pastes.');
+        }
+
+        if ($paste->isExpired()) {
+            $paste->delete();
+            abort(404, 'This paste has expired.');
+        }
+
+        $maxExpiry = config('pastebucket.user_max_expiry_hours');
+
+        // Calculate remaining hours until expiry (or 0 for never)
+        $currentExpiryHours = 0;
+        if ($paste->expires_at) {
+            $remainingHours = max(0, now()->diffInHours($paste->expires_at, false));
+            $currentExpiryHours = (int) round($remainingHours);
+        }
+
+        return Inertia::render('PasteEdit', [
+            'paste' => [
+                'slug' => $paste->slug,
+                'title' => $paste->title,
+                'content' => $paste->content,
+                'language' => $paste->language,
+                'visibility' => $paste->visibility,
+                'burn_after_read' => $paste->burn_after_read,
+                'expires_at' => $paste->expires_at?->toISOString(),
+                'is_password_protected' => $paste->isPasswordProtected(),
+            ],
+            'maxExpiry' => $maxExpiry,
+            'currentExpiryHours' => $currentExpiryHours,
+        ]);
+    }
+
+    public function update(Request $request, string $slug)
+    {
+        $paste = Paste::where('slug', $slug)->firstOrFail();
+
+        if (auth()->id() !== $paste->user_id) {
+            abort(403, 'You can only edit your own pastes.');
+        }
+
+        if ($paste->isExpired()) {
+            $paste->delete();
+            abort(404, 'This paste has expired.');
+        }
+
+        $maxExpiry = config('pastebucket.user_max_expiry_hours');
+
+        $validated = $request->validate([
+            'title' => 'nullable|string|max:255',
+            'content' => 'required|string',
+            'language' => 'nullable|string|max:50',
+            'password' => 'nullable|string|min:1',
+            'remove_password' => 'boolean',
+            'visibility' => 'required|in:public,unlisted,private',
+            'expiry_hours' => "nullable|numeric|min:0|max:{$maxExpiry}",
+            'burn_after_read' => 'boolean',
+        ]);
+
+        $updateData = [
+            'title' => $validated['title'],
+            'content' => $validated['content'],
+            'language' => $validated['language'],
+            'visibility' => $validated['visibility'],
+            'burn_after_read' => $validated['burn_after_read'] ?? false,
+        ];
+
+        // Handle expiry: recalculate from now
+        if (isset($validated['expiry_hours']) && $validated['expiry_hours'] > 0) {
+            $updateData['expires_at'] = now()->addHours($validated['expiry_hours']);
+        } elseif (isset($validated['expiry_hours']) && $validated['expiry_hours'] == 0) {
+            $updateData['expires_at'] = null; // Never expire
+        }
+
+        // Handle password changes
+        if (!empty($validated['remove_password']) && $validated['remove_password']) {
+            $updateData['password'] = null;
+        } elseif (!empty($validated['password'])) {
+            $updateData['password'] = Hash::make($validated['password']);
+        }
+
+        $paste->update($updateData);
+
+        return redirect()->route('paste.show', $paste->slug)->with('success', 'Paste updated.');
+    }
+
     public function destroy(string $slug)
     {
         $paste = Paste::where('slug', $slug)->firstOrFail();
