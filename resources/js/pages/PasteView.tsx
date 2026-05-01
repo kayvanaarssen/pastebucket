@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { CodeHighlighter } from '@/components/CodeHighlighter';
-import { Copy, Check, Trash2, ExternalLink, Clock, Eye, Lock, Flame, Globe, Link2, EyeOff, Code2, FileText, LinkIcon } from 'lucide-react';
+import { MarkdownPreview } from '@/components/MarkdownPreview';
+import { Copy, Check, Trash2, ExternalLink, Clock, Eye, Lock, Flame, Globe, Link2, EyeOff, Code2, FileText, LinkIcon, BookOpen } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
 import type { Paste, PageProps } from '@/types';
@@ -18,6 +19,7 @@ export default function PasteView({ paste }: PasteViewProps) {
     const [copied, setCopied] = useState(false);
     const [urlCopied, setUrlCopied] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [showFormatted, setShowFormatted] = useState(paste.language === 'markdown');
     const { flash } = usePage<PageProps>().props;
     const autoCopied = useRef(false);
 
@@ -141,6 +143,16 @@ export default function PasteView({ paste }: PasteViewProps) {
                                 Raw
                             </a>
                         </Button>
+                        {paste.language === 'markdown' && (
+                            <Button
+                                variant={showFormatted ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setShowFormatted(!showFormatted)}
+                            >
+                                {showFormatted ? <Code2 className="mr-1.5 h-4 w-4" /> : <BookOpen className="mr-1.5 h-4 w-4" />}
+                                {showFormatted ? 'Source' : 'Formatted'}
+                            </Button>
+                        )}
                         {paste.is_owner && (
                             <Button
                                 variant="outline"
@@ -170,9 +182,13 @@ export default function PasteView({ paste }: PasteViewProps) {
                     )}
                 </div>
 
-                {/* Code block */}
+                {/* Code block / Markdown preview */}
                 <div className="overflow-x-auto rounded-lg border">
-                    <CodeHighlighter code={paste.content} language={paste.language} />
+                    {paste.language === 'markdown' && showFormatted ? (
+                        <MarkdownPreview content={paste.content} />
+                    ) : (
+                        <CodeHighlighter code={paste.content} language={paste.language} />
+                    )}
                 </div>
             </div>
 

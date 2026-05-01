@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { languages, detectLanguage } from '@/lib/languages';
 import { getExpiryOptions } from '@/lib/expiry';
 import { CodeHighlighter } from '@/components/CodeHighlighter';
+import { MarkdownPreview } from '@/components/MarkdownPreview';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Lock, EyeOff, Globe, Link2, Flame, Code2, Clock, Eye, Info } from 'lucide-react';
 import type { PageProps } from '@/types';
@@ -119,7 +120,11 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                 <div>
                     {showPreview && data.content.trim() ? (
                         <div className="overflow-x-auto rounded-lg border min-h-[200px] sm:min-h-[300px]">
-                            <CodeHighlighter code={data.content} language={effectiveLanguage || 'text'} />
+                            {effectiveLanguage === 'markdown' ? (
+                                <MarkdownPreview content={data.content} />
+                            ) : (
+                                <CodeHighlighter code={data.content} language={effectiveLanguage || 'text'} />
+                            )}
                         </div>
                     ) : (
                         <div className="relative">
