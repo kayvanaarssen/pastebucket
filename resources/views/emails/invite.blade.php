@@ -95,7 +95,7 @@
           <td style="padding:20px 40px 28px 40px;border-top:1px solid #e8eaf0;text-align:center;">
             <p style="margin:0;font-size:12px;line-height:1.5;color:#94a3b8;">
               PasteBucket &middot; Self-hosted code sharing<br>
-              &copy; {{ date('Y') }} <a href="https://ictwebsolution.nl" style="color:#94a3b8;text-decoration:none;">ICTWebSolution B.V.</a>
+              &copy; {{ date('Y') }} @if(\App\Models\Setting::footerUrl())<a href="{{ \App\Models\Setting::footerUrl() }}" style="color:#94a3b8;text-decoration:none;">{{ \App\Models\Setting::footerCopyright() }}</a>@else{{ \App\Models\Setting::footerCopyright() }}@endif
             </p>
           </td>
         </tr>

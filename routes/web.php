@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/user/{user}', [AdminController::class, 'destroyUser'])->name('user.destroy');
         Route::post('/user/{user}/toggle-admin', [AdminController::class, 'toggleAdmin'])->name('user.toggle-admin');
         Route::post('/registration', [AdminController::class, 'updateRegistration'])->name('registration.update');
+        Route::post('/footer', [AdminController::class, 'updateFooter'])->name('footer.update');
         Route::post('/invite', [AdminController::class, 'storeInvite'])->name('invite.store');
         Route::post('/invite/{invite}/resend', [AdminController::class, 'resendInvite'])->name('invite.resend');
         Route::delete('/invite/{invite}', [AdminController::class, 'destroyInvite'])->name('invite.destroy');

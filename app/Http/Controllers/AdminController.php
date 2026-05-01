@@ -45,6 +45,10 @@ class AdminController extends Controller
                 'enabled' => Setting::registrationEnabled(),
                 'until' => Setting::registrationUntil(),
             ],
+            'footer_settings' => [
+                'copyright' => Setting::footerCopyright(),
+                'url' => Setting::footerUrl(),
+            ],
         ]);
     }
 
@@ -222,5 +226,18 @@ class AdminController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    public function updateFooter(Request $request)
+    {
+        $validated = $request->validate([
+            'copyright' => 'required|string|max:255',
+            'url' => 'nullable|url|max:255',
+        ]);
+
+        Setting::set('footer_copyright', $validated['copyright']);
+        Setting::set('footer_url', $validated['url'] ?? '');
+
+        return back()->with('success', 'Footer updated.');
     }
 }

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Trash2, Users, FileText, Activity, TrendingUp, Search, ExternalLink, UserPlus } from 'lucide-react';
+import { Trash2, Users, FileText, Activity, TrendingUp, Search, ExternalLink, UserPlus, Globe } from 'lucide-react';
 import { useState } from 'react';
 import type { PaginatedData, PageProps } from '@/types';
 
@@ -37,11 +37,19 @@ interface AdminDashboardProps extends PageProps {
         enabled: boolean;
         until: string | null;
     };
+    footer_settings: {
+        copyright: string;
+        url: string;
+    };
 }
 
-export default function AdminDashboard({ pastes, stats, search, registration }: AdminDashboardProps) {
+export default function AdminDashboard({ pastes, stats, search, registration, footer_settings }: AdminDashboardProps) {
     const [deletePasteSlug, setDeletePasteSlug] = useState<string | null>(null);
     const [regDuration, setRegDuration] = useState<string>('');
+    const footerForm = useForm({
+        copyright: footer_settings.copyright,
+        url: footer_settings.url,
+    });
     const searchForm = useForm({ search: search || '' });
 
     const handleSearch = (e: React.FormEvent) => {
@@ -183,6 +191,49 @@ export default function AdminDashboard({ pastes, stats, search, registration }: 
                                 </>
                             )}
                         </div>
+                    </CardContent>
+                </Card>
+
+                {/* Footer Settings */}
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2">
+                            <Globe className="h-5 w-5" />
+                            Footer Copyright
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                footerForm.post('/admin/footer', { preserveScroll: true });
+                            }}
+                            className="flex flex-wrap items-end gap-3"
+                        >
+                            <div className="flex flex-col gap-1">
+                                <Label className="text-xs">Company Name</Label>
+                                <Input
+                                    value={footerForm.data.copyright}
+                                    onChange={e => footerForm.setData('copyright', e.target.value)}
+                                    placeholder="ICTWebSolution B.V."
+                                    className="w-[220px]"
+                                />
+                                {footerForm.errors.copyright && <p className="text-xs text-destructive">{footerForm.errors.copyright}</p>}
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <Label className="text-xs">URL (optional)</Label>
+                                <Input
+                                    value={footerForm.data.url}
+                                    onChange={e => footerForm.setData('url', e.target.value)}
+                                    placeholder="https://example.com"
+                                    className="w-[280px]"
+                                />
+                                {footerForm.errors.url && <p className="text-xs text-destructive">{footerForm.errors.url}</p>}
+                            </div>
+                            <Button type="submit" disabled={footerForm.processing}>
+                                {footerForm.processing ? 'Saving...' : 'Save'}
+                            </Button>
+                        </form>
                     </CardContent>
                 </Card>
 
