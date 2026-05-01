@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { CodeHighlighter } from '@/components/CodeHighlighter';
-import { Copy, Check, Trash2, ExternalLink, Clock, Eye, Lock, Flame, Globe, Link2, EyeOff, Code2, FileText } from 'lucide-react';
-import { useState } from 'react';
+import { Copy, Check, Trash2, ExternalLink, Clock, Eye, Lock, Flame, Globe, Link2, EyeOff, Code2, FileText, LinkIcon } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { usePage } from '@inertiajs/react';
 import type { Paste, PageProps } from '@/types';
 
 interface PasteViewProps extends PageProps {
@@ -15,12 +16,34 @@ interface PasteViewProps extends PageProps {
 
 export default function PasteView({ paste }: PasteViewProps) {
     const [copied, setCopied] = useState(false);
+    const [urlCopied, setUrlCopied] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const { flash } = usePage<PageProps>().props;
+    const autoCopied = useRef(false);
+
+    const pasteUrl = `${window.location.origin}/p/${paste.slug}`;
+
+    // Auto-copy URL to clipboard when paste is just created
+    useEffect(() => {
+        if (flash.just_created && !autoCopied.current) {
+            autoCopied.current = true;
+            navigator.clipboard.writeText(pasteUrl).then(() => {
+                setUrlCopied(true);
+                setTimeout(() => setUrlCopied(false), 3000);
+            });
+        }
+    }, [flash.just_created]);
 
     const copyToClipboard = async () => {
         await navigator.clipboard.writeText(paste.content);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    const copyUrl = async () => {
+        await navigator.clipboard.writeText(pasteUrl);
+        setUrlCopied(true);
+        setTimeout(() => setUrlCopied(false), 2000);
     };
 
     const formatDate = (dateStr: string) => {
@@ -90,6 +113,17 @@ export default function PasteView({ paste }: PasteViewProps) {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button size="sm" onClick={copyUrl} className={urlCopied ? 'bg-green-600 hover:bg-green-700 text-white' : ''}>
+                                        {urlCopied ? <Check className="mr-1.5 h-4 w-4" /> : <LinkIcon className="mr-1.5 h-4 w-4" />}
+                                        {urlCopied ? 'URL Copied!' : 'Copy URL'}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Copy paste URL to clipboard</TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
