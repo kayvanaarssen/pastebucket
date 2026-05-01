@@ -45,6 +45,7 @@ export interface PageProps {
     flash: {
         success: string | null;
         error: string | null;
+        just_created: boolean;
     };
 }
 

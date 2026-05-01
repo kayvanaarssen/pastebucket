@@ -57,7 +57,7 @@ class PasteController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        return redirect()->route('paste.show', $paste->slug);
+        return redirect()->route('paste.show', $paste->slug)->with('just_created', true);
     }
 
     public function show(string $slug)
