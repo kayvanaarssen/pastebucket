@@ -94,7 +94,7 @@ export function CodeHighlighter({ code, language = 'text', showLineNumbers = tru
             language={language || 'text'}
             style={resolvedTheme === 'dark' ? vs2015 : atomOneLight}
             showLineNumbers={showLineNumbers}
-            wrapLongLines
+            wrapLongLines={false}
             customStyle={{
                 margin: 0,
                 borderRadius: 0,
