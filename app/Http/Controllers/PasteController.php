@@ -62,6 +62,9 @@ class PasteController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
+        // Mark this session as the creator so burn-after-read doesn't fire on their first view
+        session(["paste_creator_{$paste->slug}" => true]);
+
         return redirect()->route('paste.show', $paste->slug)->with('just_created', true);
     }
 
@@ -90,17 +93,14 @@ class PasteController extends Controller
             }
         }
 
-        // Handle burn after read
-        $isBurned = false;
-        if ($paste->burn_after_read && $paste->views > 0 && auth()->id() !== $paste->user_id) {
-            $paste->delete();
-            abort(404, 'This paste has been burned after reading.');
-        }
+        // Determine if the viewer is the owner (authenticated owner or anonymous creator via session)
+        $isOwner = (auth()->check() && auth()->id() === $paste->user_id)
+            || session("paste_creator_{$paste->slug}", false);
 
         // Increment views
         $paste->increment('views');
 
-        return Inertia::render('PasteView', [
+        $response = Inertia::render('PasteView', [
             'paste' => [
                 'slug' => $paste->slug,
                 'title' => $paste->title,
@@ -111,11 +111,18 @@ class PasteController extends Controller
                 'views' => $paste->views,
                 'expires_at' => $paste->expires_at?->toISOString(),
                 'created_at' => $paste->created_at->toISOString(),
-                'is_owner' => auth()->check() && auth()->id() === $paste->user_id,
+                'is_owner' => $isOwner,
                 'author' => $paste->user?->name,
                 'is_password_protected' => $paste->isPasswordProtected(),
             ],
         ]);
+
+        // Burn after read: delete AFTER preparing the response so the viewer sees the content
+        if ($paste->burn_after_read && !$isOwner) {
+            $paste->delete();
+        }
+
+        return $response;
     }
 
     public function verifyPassword(Request $request, string $slug)
