@@ -49,7 +49,7 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 
 ## Tech Stack
 
-- **Backend**: Laravel 13, PHP 8.2+
+- **Backend**: Laravel 13, PHP 8.4.1+
 - **Frontend**: React 19, TypeScript, Inertia.js v3
 - **UI Components**: shadcn/ui (Radix UI + Tailwind CSS v4)
 - **Syntax Highlighting**: react-syntax-highlighter (Prism)
@@ -59,9 +59,9 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 
 ### Requirements
 
-- PHP 8.2+
+- PHP 8.4.1+
 - Composer
-- Node.js 18+
+- Node.js 22+
 - MySQL 8.0+ / PostgreSQL 14+ / SQLite
 
 ### Local Development
@@ -113,7 +113,7 @@ npm run dev
 
 - In Ploi, create a new site pointing to your domain
 - Set the web directory to `/public`
-- Select PHP 8.2+ as the PHP version
+- Select PHP 8.4.1+ as the PHP version
 
 ### 2. Connect Repository
 
