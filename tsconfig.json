@@ -8,11 +8,10 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "baseUrl": ".",
         "paths": {
-            "@/*": ["resources/js/*"]
+            "@/*": ["./resources/js/*"]
         },
-        "types": ["node"]
+        "types": ["node", "vite/client"]
     },
     "include": ["resources/js/**/*.ts", "resources/js/**/*.tsx"],
     "exclude": ["node_modules"]

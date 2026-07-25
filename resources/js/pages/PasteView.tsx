@@ -195,7 +195,7 @@ export default function PasteView({ paste }: PasteViewProps) {
                     {paste.language === 'markdown' && showFormatted ? (
                         <MarkdownPreview content={paste.content} />
                     ) : (
-                        <CodeHighlighter code={paste.content} language={paste.language} />
+                        <CodeHighlighter code={paste.content} language={paste.language ?? undefined} />
                     )}
                 </div>
             </div>

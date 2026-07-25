@@ -38,6 +38,10 @@ export interface PaginatedData<T> {
 }
 
 export interface PageProps {
+    // Inertia's own PageProps is `{ [key: string]: unknown }`, and usePage<T>()
+    // constrains T to it, so this index signature is required for the generic
+    // to accept these props.
+    [key: string]: unknown;
     auth: {
         user: User | null;
     };
