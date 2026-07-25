@@ -11,7 +11,7 @@
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
         "tightenco/ziggy": "^2.6",
-        "web-auth/webauthn-lib": "^4.9"
+        "web-auth/webauthn-lib": "^5.3.5"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
