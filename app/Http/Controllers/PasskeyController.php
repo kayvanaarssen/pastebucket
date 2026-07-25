@@ -70,28 +70,15 @@ class PasskeyController extends Controller
 
         $challenge = $request->session()->pull('passkey_challenge');
         if (!$challenge) {
-            return back()->withErrors(['error' => 'Challenge expired. Please try again.']);
+            return response()->json(['error' => 'Challenge expired. Please try again.'], 422);
         }
 
         $credential = $request->input('credential');
         $clientDataJSON = $this->base64urlDecode($credential['response']['clientDataJSON']);
         $clientData = json_decode($clientDataJSON, true);
 
-        // Verify challenge
-        $expectedChallenge = $this->base64urlEncode(base64_decode($challenge));
-        if (!hash_equals($expectedChallenge, $clientData['challenge'])) {
-            return back()->withErrors(['error' => 'Challenge verification failed.']);
-        }
-
-        // Verify origin
-        $expectedOrigin = config('app.url');
-        if ($clientData['origin'] !== $expectedOrigin) {
-            return back()->withErrors(['error' => 'Origin verification failed.']);
-        }
-
-        // Verify type
-        if ($clientData['type'] !== 'webauthn.create') {
-            return back()->withErrors(['error' => 'Invalid ceremony type.']);
+        if ($error = $this->validateClientData($clientData, 'webauthn.create', $challenge)) {
+            return response()->json(['error' => $error], 422);
         }
 
         // Parse attestation object to extract public key
@@ -99,7 +86,14 @@ class PasskeyController extends Controller
         $authData = $this->parseAttestationObject($attestationObject);
 
         if (!$authData) {
-            return back()->withErrors(['error' => 'Failed to parse attestation data.']);
+            return response()->json(['error' => 'Failed to parse attestation data.'], 422);
+        }
+
+        // Assert the RP ID hash and the User Present / User Verified flags.
+        // registerOptions() requests userVerification=required, so these have
+        // to be checked rather than merely parsed.
+        if ($error = $this->verifyAuthenticatorData($authData['auth_data'])) {
+            return response()->json(['error' => $error], 422);
         }
 
         // Store only what we need, with the algorithm identifier
@@ -117,7 +111,7 @@ class PasskeyController extends Controller
             'transports' => $credential['transports'] ?? [],
         ]);
 
-        return back()->with('success', 'Passkey registered successfully.');
+        return response()->json(['success' => true]);
     }
 
     /**
@@ -160,15 +154,8 @@ class PasskeyController extends Controller
         $clientDataJSON = $this->base64urlDecode($credential['response']['clientDataJSON']);
         $clientData = json_decode($clientDataJSON, true);
 
-        // Verify challenge
-        $expectedChallenge = $this->base64urlEncode(base64_decode($challenge));
-        if (!hash_equals($expectedChallenge, $clientData['challenge'])) {
-            return response()->json(['error' => 'Challenge verification failed.'], 422);
-        }
-
-        // Verify origin
-        if ($clientData['origin'] !== config('app.url')) {
-            return response()->json(['error' => 'Origin verification failed.'], 422);
+        if ($error = $this->validateClientData($clientData, 'webauthn.get', $challenge)) {
+            return response()->json(['error' => $error], 422);
         }
 
         // Find the passkey
@@ -179,6 +166,14 @@ class PasskeyController extends Controller
 
         // Verify authenticator data and update counter
         $authData = $this->base64urlDecode($credential['response']['authenticatorData']);
+
+        // Assert the RP ID hash and the User Present / User Verified flags.
+        // authenticateOptions() requests userVerification=required, so an
+        // assertion with uv=0 must not be accepted.
+        if ($error = $this->verifyAuthenticatorData($authData)) {
+            return response()->json(['error' => $error], 422);
+        }
+
         $counter = unpack('N', substr($authData, 33, 4))[1];
 
         if ($counter > 0 && $counter <= $passkey->counter) {
@@ -219,7 +214,8 @@ class PasskeyController extends Controller
         }
 
         $passkey->delete();
-        return back()->with('success', 'Passkey removed.');
+
+        return response()->json(['success' => true]);
     }
 
     /**
@@ -257,8 +253,13 @@ class PasskeyController extends Controller
 
         // Parse authData:
         // 32 bytes rpIdHash + 1 byte flags + 4 bytes counter + variable attestedCredentialData
-        $offset = 0;
-        $rpIdHash = substr($authData, $offset, 32); $offset += 32;
+        if (strlen($authData) < 37) {
+            return null;
+        }
+
+        // rpIdHash and the flag bits are asserted by verifyAuthenticatorData(),
+        // which the caller runs against the raw authData returned below.
+        $offset = 32;
         $flags = ord($authData[$offset]); $offset += 1;
         $counter = unpack('N', substr($authData, $offset, 4))[1]; $offset += 4;
 
@@ -281,11 +282,109 @@ class PasskeyController extends Controller
         $coseKey = $this->cborDecode($publicKeyBytes);
 
         return [
+            'auth_data' => $authData,
             'counter' => $counter,
             'aaguid' => bin2hex($aaguid),
             'cose_key' => $coseKey,
             'public_key_pem' => $this->coseKeyToPem($coseKey),
         ];
+    }
+
+    /**
+     * The Relying Party ID: the effective domain of the application.
+     */
+    private function rpId(): string
+    {
+        return parse_url(config('app.url'), PHP_URL_HOST) ?: '';
+    }
+
+    /**
+     * Validate the decoded clientDataJSON for a ceremony.
+     *
+     * Returns an error message, or null when the client data is acceptable.
+     */
+    private function validateClientData(mixed $clientData, string $expectedType, string $challenge): ?string
+    {
+        if (!is_array($clientData)
+            || !isset($clientData['challenge'], $clientData['origin'], $clientData['type'])
+            || !is_string($clientData['challenge'])
+            || !is_string($clientData['origin'])
+            || !is_string($clientData['type'])) {
+            return 'Malformed client data.';
+        }
+
+        if (!hash_equals($this->base64urlEncode(base64_decode($challenge)), $clientData['challenge'])) {
+            return 'Challenge verification failed.';
+        }
+
+        if (!$this->originMatches($clientData['origin'])) {
+            return 'Origin verification failed.';
+        }
+
+        // Binding the ceremony type prevents a registration clientDataJSON
+        // from being replayed against the authentication endpoint.
+        if ($clientData['type'] !== $expectedType) {
+            return 'Invalid ceremony type.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Compare a browser-supplied origin against APP_URL on scheme, host and
+     * port only. A browser origin never carries a path or trailing slash, so
+     * comparing the raw strings breaks whenever APP_URL has either.
+     */
+    private function originMatches(string $origin): bool
+    {
+        $expected = parse_url((string) config('app.url'));
+        $actual = parse_url($origin);
+
+        if (!is_array($expected) || !is_array($actual)
+            || !isset($expected['host'], $actual['host'], $actual['scheme'])) {
+            return false;
+        }
+
+        $expectedScheme = strtolower($expected['scheme'] ?? 'https');
+        $actualScheme = strtolower($actual['scheme']);
+
+        $defaultPort = fn (string $scheme) => $scheme === 'https' ? 443 : 80;
+        $expectedPort = $expected['port'] ?? $defaultPort($expectedScheme);
+        $actualPort = $actual['port'] ?? $defaultPort($actualScheme);
+
+        return $expectedScheme === $actualScheme
+            && strtolower($expected['host']) === strtolower($actual['host'])
+            && $expectedPort === $actualPort;
+    }
+
+    /**
+     * Assert the RP ID hash and the User Present / User Verified flags in
+     * authenticator data.
+     *
+     * Returns an error message, or null when the data is acceptable.
+     */
+    private function verifyAuthenticatorData(string $authData): ?string
+    {
+        // 32 bytes rpIdHash + 1 byte flags + 4 bytes counter
+        if (strlen($authData) < 37) {
+            return 'Malformed authenticator data.';
+        }
+
+        if (!hash_equals(hash('sha256', $this->rpId(), true), substr($authData, 0, 32))) {
+            return 'RP ID verification failed.';
+        }
+
+        $flags = ord($authData[32]);
+
+        if (!($flags & 0x01)) {
+            return 'User presence required.';
+        }
+
+        if (!($flags & 0x04)) {
+            return 'User verification required.';
+        }
+
+        return null;
     }
 
     private function coseKeyToPem(?array $coseKey): ?string

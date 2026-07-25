@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Fingerprint } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { startAuthentication, browserSupportsWebAuthn, browserSupportsWebAuthnAutofill } from '@simplewebauthn/browser';
+import { apiFetch } from '@/lib/api';
 
 export default function Login() {
     const { registration_enabled } = usePage<PageProps>().props;
@@ -23,12 +24,8 @@ export default function Login() {
     const conditionalAbort = useRef<AbortController | null>(null);
 
     const verifyPasskey = async (credential: any) => {
-        const verifyRes = await fetch('/passkey/authenticate', {
+        const verifyRes = await apiFetch('/passkey/authenticate', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
-            },
             body: JSON.stringify({ credential }),
         });
 
@@ -51,13 +48,7 @@ export default function Login() {
             if (!supported || cancelled) return;
 
             try {
-                const optionsRes = await fetch('/passkey/authenticate/options', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
-                    },
-                });
+                const optionsRes = await apiFetch('/passkey/authenticate/options', { method: 'POST' });
                 if (!optionsRes.ok || cancelled) return;
                 const options = await optionsRes.json();
 
@@ -92,13 +83,7 @@ export default function Login() {
         setPasskeyError(null);
         setPasskeyLoading(true);
         try {
-            const optionsRes = await fetch('/passkey/authenticate/options', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
-                },
-            });
+            const optionsRes = await apiFetch('/passkey/authenticate/options', { method: 'POST' });
             const options = await optionsRes.json();
 
             const credential = await startAuthentication({ optionsJSON: options });

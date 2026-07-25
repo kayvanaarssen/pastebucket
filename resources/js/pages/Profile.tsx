@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Fingerprint, KeyRound, Plus, Trash2, User, Lock } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser';
+import { apiFetch } from '@/lib/api';
 import type { PageProps } from '@/types';
 
 interface PasskeyInfo {
@@ -57,7 +58,7 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
     };
 
     const fetchPasskeys = async () => {
-        const res = await fetch('/passkeys');
+        const res = await apiFetch('/passkeys');
         setPasskeys(await res.json());
     };
 
@@ -66,22 +67,12 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
         setPasskeyError(null);
         setRegistering(true);
         try {
-            const optionsRes = await fetch('/passkey/register/options', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
-                },
-            });
+            const optionsRes = await apiFetch('/passkey/register/options', { method: 'POST' });
             const options = await optionsRes.json();
             const credential = await startRegistration({ optionsJSON: options });
 
-            const res = await fetch('/passkey/register', {
+            const res = await apiFetch('/passkey/register', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
-                },
                 body: JSON.stringify({ name: passkeyName, credential }),
             });
 
@@ -90,8 +81,8 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
                 setPasskeyName('');
                 fetchPasskeys();
             } else {
-                const data = await res.json();
-                setPasskeyError(data.errors?.error || 'Registration failed.');
+                const data = await res.json().catch(() => null);
+                setPasskeyError(data?.error || data?.message || 'Registration failed.');
             }
         } catch (err: any) {
             setPasskeyError(err.name === 'NotAllowedError' ? 'Registration was cancelled.' : 'Failed to register passkey.');
@@ -101,12 +92,22 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
     };
 
     const deletePasskey = async (id: number) => {
-        await fetch(`/passkey/${id}`, {
-            method: 'DELETE',
-            headers: { 'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '') },
-        });
-        fetchPasskeys();
-        setDeletePasskeyId(null);
+        setPasskeyError(null);
+        try {
+            const res = await apiFetch(`/passkey/${id}`, { method: 'DELETE' });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => null);
+                setPasskeyError(data?.error || data?.message || 'Failed to remove passkey.');
+                return;
+            }
+
+            setDeletePasskeyId(null);
+        } catch {
+            setPasskeyError('Failed to remove passkey.');
+        } finally {
+            fetchPasskeys();
+        }
     };
 
     const formatDate = (dateStr: string) => {
