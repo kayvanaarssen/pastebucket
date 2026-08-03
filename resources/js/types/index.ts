@@ -6,11 +6,29 @@ export interface User {
     is_admin: boolean;
 }
 
+/**
+ * Non-secret encryption parameters travelling with an encrypted paste. Mirrors
+ * EncryptionMeta in lib/crypto.ts and the `encryption_meta` JSON column.
+ */
+export interface EncryptionMeta {
+    mode: 'fragment' | 'password';
+    iv: string;
+    salt?: string;
+    iterations?: number;
+    wrapped_key?: string;
+    wrap_iv?: string;
+}
+
 export interface Paste {
     id?: number;
     slug: string;
     title: string | null;
+    /** Ciphertext when is_encrypted, plaintext for legacy pastes. */
     content: string;
+    /** Null for legacy pastes created before end-to-end encryption. */
+    encryption_version: number | null;
+    encryption_meta: EncryptionMeta | null;
+    is_encrypted: boolean;
     language: string | null;
     visibility: 'public' | 'unlisted' | 'private';
     burn_after_read: boolean;

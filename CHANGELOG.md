@@ -2,6 +2,33 @@
 
 All notable changes to PasteBucket will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **End-to-end encryption** — paste content is encrypted in the browser with AES-GCM-256 before it is sent. The server stores ciphertext and never receives the key
+- Link-key mode: the content key travels in the URL fragment (`/p/{slug}#k=...`), which browsers never transmit to the server
+- Password mode: the content key is wrapped with a PBKDF2-HMAC-SHA256 key (600,000 iterations) derived in the browser. The password itself is never sent
+- Client-side raw view at `/p/{slug}/raw` for encrypted pastes, with copy and download actions
+- Burn-after-read acknowledgement endpoint, so encrypted pastes are destroyed only after a viewer actually decrypts them
+- Encryption section in the README documenting the threat model, including what end-to-end encryption does *not* protect against
+
+### Changed
+
+- Paste passwords are no longer hashed and stored server-side for encrypted pastes — the password only unwraps the content key in the browser, so storing a verifier would weaken the key
+- The server-side password gate and `/p/{slug}/verify` route now apply to legacy plaintext pastes only; encrypted pastes unlock entirely in the browser
+- Editing a legacy plaintext paste encrypts it
+
+### Security
+
+- Paste content is no longer readable from a database dump or by the server operator
+- Removed the server-side password verification round-trip, and with it a timing oracle on paste passwords
+
+### Notes
+
+- Pastes created before this release remain stored in plaintext, are labelled with an "unencrypted" badge, and should be treated as previously exposed. They cannot be encrypted retroactively without the server holding a key
+- Paste titles, language, and timestamps remain plaintext so listing and search keep working — do not put secrets in a paste title
+
 ## [1.2.0] - 2026-05-01
 
 ### Added

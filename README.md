@@ -16,8 +16,9 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 
 - **Syntax Highlighting** - Auto-detection for 40+ languages with manual override. Powered by Prism via react-syntax-highlighter.
 - **Light & Dark Mode** - Automatic theme switching based on system preference, with manual toggle. Syntax highlighting adapts instantly.
-- **Password Protection** - Optionally protect any paste with a password (bcrypt hashed).
-- **Burn After Read** - Self-destructing pastes that are deleted after first view.
+- **End-to-End Encryption** - Paste content is encrypted in your browser with AES-GCM-256 before it is sent. The server stores ciphertext and never receives the key. See [Encryption](#encryption) for what this does and does not protect against.
+- **Password Protection** - Optionally protect any paste with a password. The password never leaves your browser; it derives a key that unwraps the paste's content key.
+- **Burn After Read** - Self-destructing pastes, deleted once the viewer has actually decrypted them.
 - **Configurable Expiry** - Guests: 1 hour to 7 days. Logged-in users: up to 365 days. Defaults configurable via `.env`.
 - **Visibility Controls** - Public, unlisted, or private (login required) pastes.
 - **Secure URLs** - 16-character random slugs for unpredictable paste URLs.
@@ -28,7 +29,34 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 - **Responsive Design** - Fully responsive layout for mobile, tablet, and desktop.
 - **Tab Support** - Tab key inserts actual tab characters in the editor.
 - **Passkey Authentication** - Sign in with Face ID, Touch ID, or Windows Hello via WebAuthn. Manage passkeys from the dashboard.
-- **Raw View** - Access raw paste content at `/p/{slug}/raw`.
+- **Raw View** - Access raw paste content at `/p/{slug}/raw`. For encrypted pastes this decrypts in the browser, so it needs the key fragment and is not fetchable with `curl`.
+
+## Encryption
+
+Paste content is encrypted client-side before it reaches the server.
+
+Each paste gets a random 256-bit content key (CEK) and is encrypted with AES-GCM. The CEK reaches its readers one of two ways:
+
+- **Link key** (default) - the CEK is base64url-encoded into the URL fragment: `/p/{slug}#k=...`. Browsers never send the fragment to the server, so the key stays local. **Anyone with the full link can read the paste, and losing the fragment makes the paste permanently unrecoverable.**
+- **Password** - the CEK is wrapped with a key derived from your password via PBKDF2-HMAC-SHA256 (600,000 iterations). Only the wrapped bytes are stored. The server never sees the password, so it cannot verify it: a wrong password simply fails to decrypt.
+
+### What this protects against
+
+A database dump, a stolen backup, or an operator reading pastes directly out of storage. Someone with full database access sees ciphertext and non-secret parameters (IV, salt, iteration count) — not content.
+
+### What it does not protect against
+
+- **A compromised server.** The decryption code is JavaScript served by the same server. An attacker who can modify what it serves can capture keys as they are used. This is the standing limitation of browser-delivered cryptography and applies to every web app of this design.
+- **Metadata.** Paste titles, language, visibility, timestamps, view counts, and the creator's IP are stored in plaintext so the app can list and search pastes. **Do not put secrets in a paste title.**
+- **Anyone holding the link.** The key is in the URL. Treat a paste link like the secret itself — beware of chat logs, referrer headers on any link the paste content itself renders, and browser history.
+
+### Legacy pastes
+
+Pastes created before encryption was added remain stored in plaintext and are shown with an "unencrypted" badge. The server cannot encrypt them retroactively — doing so would mean the server holding a key, which is precisely what this design rules out. Editing a legacy paste encrypts it. Anything already in your database should be treated as previously exposed.
+
+### Burn after read
+
+Encrypted burn-after-read pastes are deleted once the viewer's browser confirms a successful decryption, not at page render. Otherwise a visitor arriving without a valid key would destroy content nobody could read. The trade-off: a paste survives if the reader closes the tab mid-load.
 
 ## Screenshots
 

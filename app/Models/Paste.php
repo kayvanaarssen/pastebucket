@@ -18,6 +18,8 @@ class Paste extends Model
         'user_id',
         'title',
         'content',
+        'encryption_version',
+        'encryption_meta',
         'language',
         'password',
         'visibility',
@@ -47,6 +49,7 @@ class Paste extends Model
         return [
             'expires_at' => 'datetime',
             'burn_after_read' => 'boolean',
+            'encryption_meta' => 'array',
         ];
     }
 
@@ -87,9 +90,28 @@ class Paste extends Model
 
     /**
      * Determine if the paste is password protected.
+     *
+     * For encrypted pastes this is a property of the envelope: the content key
+     * is wrapped under a password-derived key, so the server has no password to
+     * check. Legacy pastes fall back to the old server-side password column.
      */
     public function isPasswordProtected(): bool
     {
+        if ($this->isEncrypted()) {
+            return ($this->encryption_meta['mode'] ?? null) === 'password';
+        }
+
         return $this->password !== null;
+    }
+
+    /**
+     * Determine if the paste content is end-to-end encrypted.
+     *
+     * Pastes created before E2E landed have a null version and remain stored as
+     * plaintext; they cannot be upgraded server-side without a key.
+     */
+    public function isEncrypted(): bool
+    {
+        return $this->encryption_version !== null;
     }
 }

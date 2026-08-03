@@ -12,7 +12,8 @@ import { getExpiryOptions } from '@/lib/expiry';
 import { CodeHighlighter } from '@/components/CodeHighlighter';
 import { MarkdownPreview } from '@/components/MarkdownPreview';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Lock, EyeOff, Globe, Link2, Flame, Code2, Clock, Eye, Info } from 'lucide-react';
+import { Lock, EyeOff, Globe, Link2, Flame, Code2, Clock, Eye, Info, ShieldAlert } from 'lucide-react';
+import { encryptContent, isCryptoAvailable, stashPendingKey, writeKeyToFragment } from '@/lib/crypto';
 import type { PageProps } from '@/types';
 
 interface HomeProps extends PageProps {
@@ -20,6 +21,11 @@ interface HomeProps extends PageProps {
     maxExpiry: number;
     isAuthenticated: boolean;
 }
+
+const NO_CRYPTO_MESSAGE =
+    'This page cannot encrypt: WebCrypto is unavailable, which usually means the site '
+    + 'was loaded over plain http rather than https. Pastes are never sent unencrypted, '
+    + 'so creating one is disabled until you reload over a secure connection.';
 
 export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: HomeProps) {
     const { data, setData, post, processing, errors, transform } = useForm({
@@ -36,7 +42,12 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
     const [autoDetected, setAutoDetected] = useState<string | null>(null);
     const [showPreview, setShowPreview] = useState(false);
     const detectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Encryption runs before the request starts, so `processing` is still false
+    // while it happens and cannot be used to guard against a double submit.
+    const [encrypting, setEncrypting] = useState(false);
+    const [cryptoError, setCryptoError] = useState<string | null>(null);
 
+    const canEncrypt = isCryptoAvailable();
     const expiryOptions = getExpiryOptions(maxExpiry, isAuthenticated);
 
     const handleContentChange = useCallback((value: string) => {
@@ -66,16 +77,53 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
         }
     };
 
-    const submit = (e: React.FormEvent) => {
+    const submit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (encrypting || !canEncrypt) return;
+
         if (!data.language && autoDetected) {
             setData('language', autoDetected);
         }
+
+        // Inertia's transform is synchronous, so the ciphertext has to exist
+        // before the request is built. Encrypt first, then let transform close
+        // over the result -- that keeps useForm owning the validation errors.
+        setCryptoError(null);
+        setEncrypting(true);
+
+        const encrypted = await encryptContent(data.content, data.password || null)
+            .catch(() => null);
+        setEncrypting(false);
+        if (!encrypted) {
+            setCryptoError('Encryption failed, so nothing was sent. Please try again.');
+            return;
+        }
+
+        // The server redirects to /p/{slug} and a redirect cannot carry a
+        // fragment, so the key has to be held here and reattached afterwards.
+        const fragmentKey = encrypted.fragmentKey ?? null;
+
+        // Inertia mounts PasteView before onSuccess runs, so the key written
+        // below lands after that page has already looked for it. Stash it first
+        // -- the view claims it synchronously on mount, with no timing window.
+        if (fragmentKey) stashPendingKey(fragmentKey);
+
         transform((formData) => ({
             ...formData,
             language: formData.language || autoDetected || '',
+            content: encrypted.content,
+            // The password was consumed locally to wrap the content key. Sending
+            // it would hand the server the one thing it needs to unwrap it.
+            password: '',
+            encryption_version: encrypted.encryption_version,
+            encryption_meta: encrypted.encryption_meta,
         }));
-        post('/paste');
+
+        post('/paste', {
+            onSuccess: () => {
+                if (fragmentKey) writeKeyToFragment(fragmentKey);
+            },
+        });
     };
 
     const effectiveLanguage = data.language || autoDetected;
@@ -84,6 +132,14 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
         <AppLayout>
             <Head title="New Paste" />
             <form onSubmit={submit} className="space-y-3">
+                {/* Encryption is not optional -- say so rather than degrading quietly */}
+                {(!canEncrypt || cryptoError) && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{canEncrypt ? cryptoError : NO_CRYPTO_MESSAGE}</span>
+                    </div>
+                )}
+
                 {/* Title + language badge */}
                 <div className="flex items-center gap-3">
                     <div className="flex-1">
@@ -271,9 +327,9 @@ export default function Home({ defaultExpiry, maxExpiry, isAuthenticated }: Home
                         <Button
                             type="submit"
                             className="ml-auto self-center"
-                            disabled={processing || !data.content.trim()}
+                            disabled={processing || encrypting || !canEncrypt || !data.content.trim()}
                         >
-                            {processing ? 'Creating...' : 'Create Paste'}
+                            {encrypting ? 'Encrypting...' : processing ? 'Creating...' : 'Create Paste'}
                         </Button>
                     </CardContent>
                 </Card>
