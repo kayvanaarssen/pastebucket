@@ -22,6 +22,7 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 - **Configurable Expiry** - Guests: 1 hour to 7 days. Logged-in users: up to 365 days. Defaults configurable via `.env`.
 - **Visibility Controls** - Public, unlisted, or private (login required) pastes.
 - **Secure URLs** - 16-character random slugs for unpredictable paste URLs.
+- **Short Links** - The paste owner can mint a 6-character alias at `/s/{code}`, short enough to read out or type by hand. The alphabet drops every ambiguous glyph (`0`/`O`/`o`, `1`/`l`/`I`, `f`). For a password-protected paste the short link is the whole link. For a link-key paste the decryption key is still appended in the browser as `#k=...`, so the URL is shorter but not fully typeable - the key never reaches the server either way.
 - **No Character Limit** - Designed for sharing long code snippets with preserved structure.
 - **Registration Control** - Registration disabled by default. Enable permanently or temporarily (15 min to 24 hours) from the admin panel. Auto-disables when the window expires.
 - **User Invites** - Admins can create secure, single-use invite links from the user management page. Invitees pick their own password (10+ chars, mixed case, number, symbol) and can add a passkey afterwards. Invites can be emailed automatically with a branded HTML template, copied manually, resent, or revoked. Configurable expiry from 1 hour to 30 days.

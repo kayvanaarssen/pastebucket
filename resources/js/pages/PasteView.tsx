@@ -92,6 +92,10 @@ export default function PasteView({ paste }: PasteViewProps) {
         () => readKeyFromFragment() ?? claimKeyForNewPaste(),
     );
     const [password, setPassword] = useState('');
+    const [shortUrl, setShortUrl] = useState<string | null>(paste.short_url);
+    const [shortCopied, setShortCopied] = useState(false);
+    const [shortPending, setShortPending] = useState(false);
+    const [shortError, setShortError] = useState<string | null>(null);
     const { flash } = usePage<PageProps>().props;
     const autoCopied = useRef(false);
     const burnAcked = useRef(false);
@@ -203,6 +207,39 @@ export default function PasteView({ paste }: PasteViewProps) {
         setTimeout(() => setUrlCopied(false), 2000);
     };
 
+    /**
+     * Copy the short link, minting one on first use.
+     *
+     * The server mints only the /s/{code} half. The decryption key has never
+     * left this browser and is not part of what was minted, so it is reattached
+     * here -- exactly as buildShareUrl does for the long URL.
+     */
+    const copyShortLink = async () => {
+        if (shortPending) return;
+
+        let target = shortUrl;
+
+        if (!target) {
+            setShortPending(true);
+            setShortError(null);
+            try {
+                const response = await apiFetch(`/p/${paste.slug}/short-link`, { method: 'POST' });
+                if (!response.ok) throw new Error(String(response.status));
+                target = (await response.json()).short_url as string;
+                setShortUrl(target);
+            } catch {
+                setShortError('Could not create a short link.');
+                setShortPending(false);
+                return;
+            }
+            setShortPending(false);
+        }
+
+        await navigator.clipboard.writeText(fragmentKey ? `${target}#k=${fragmentKey}` : target);
+        setShortCopied(true);
+        setTimeout(() => setShortCopied(false), 2000);
+    };
+
     const formatDate = (dateStr: string) => {
         return new Date(dateStr).toLocaleDateString('en-US', {
             year: 'numeric',
@@ -295,6 +332,37 @@ export default function PasteView({ paste }: PasteViewProps) {
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
+                        {(paste.is_owner || shortUrl) && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={copyShortLink}
+                                            disabled={shortPending}
+                                            className={shortCopied ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+                                        >
+                                            {shortPending ? (
+                                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                            ) : shortCopied ? (
+                                                <Check className="mr-1.5 h-4 w-4" />
+                                            ) : (
+                                                <Link2 className="mr-1.5 h-4 w-4" />
+                                            )}
+                                            {shortCopied ? 'Short Link Copied!' : 'Short Link'}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        {shortError
+                                            ? shortError
+                                            : fragmentKey
+                                              ? 'Copy a short link — the decryption key is still appended'
+                                              : 'Copy a short, typeable link to this paste'}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>

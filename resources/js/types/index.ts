@@ -22,6 +22,8 @@ export interface EncryptionMeta {
 export interface Paste {
     id?: number;
     slug: string;
+    /** Short-link URL without a fragment; null until the owner mints one. */
+    short_url: string | null;
     title: string | null;
     /** Ciphertext when is_encrypted, plaintext for legacy pastes. */
     content: string;

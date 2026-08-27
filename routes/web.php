@@ -60,8 +60,16 @@ Route::middleware('auth')->group(function () {
     });
 });
 
+// Short links. Throttled because a 6-character code is a far smaller search
+// space than a 16-character slug, and this is the only route that exposes it.
+Route::get('/s/{code}', [PasteController::class, 'showByShortCode'])
+    ->where('code', '[a-zA-Z0-9]{4,16}')
+    ->middleware('throttle:30,1')
+    ->name('paste.short');
+
 // Paste routes (must be last due to catch-all slug)
 Route::get('/p/{slug}', [PasteController::class, 'show'])->name('paste.show');
+Route::post('/p/{slug}/short-link', [PasteController::class, 'createShortLink'])->name('paste.short-link');
 Route::post('/p/{slug}/verify', [PasteController::class, 'verifyPassword'])->name('paste.verify');
 Route::post('/p/{slug}/burn', [PasteController::class, 'burn'])->name('paste.burn');
 Route::get('/p/{slug}/raw', [PasteController::class, 'showRaw'])->name('paste.raw');

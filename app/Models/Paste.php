@@ -15,6 +15,7 @@ class Paste extends Model
      */
     protected $fillable = [
         'slug',
+        'short_code',
         'user_id',
         'title',
         'content',
@@ -102,6 +103,18 @@ class Paste extends Model
         }
 
         return $this->password !== null;
+    }
+
+    /**
+     * Determine whether the given viewer owns this paste.
+     *
+     * Guests who create a paste are remembered by session, so they keep owner
+     * rights over something they never had an account for.
+     */
+    public function isOwnedByViewer(): bool
+    {
+        return (auth()->check() && auth()->id() === $this->user_id)
+            || session("paste_creator_{$this->slug}", false);
     }
 
     /**

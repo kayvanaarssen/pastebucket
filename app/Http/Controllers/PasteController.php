@@ -10,6 +10,18 @@ use Inertia\Inertia;
 
 class PasteController extends Controller
 {
+    /**
+     * Alphabet for short codes, matching the one Shortlinker uses.
+     *
+     * Drops every glyph pair that goes wrong when a code is read aloud or copied
+     * off a screen: 0/O/o, 1/l/I, and f (heard as "s"). What is left is 52
+     * characters, so six of them is a shade under 2^34 -- unguessable enough
+     * for a rate-limited lookup, short enough to dictate over the phone.
+     */
+    private const SHORT_CODE_ALPHABET = 'abcdegjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+    private const SHORT_CODE_LENGTH = 6;
+
     public function index()
     {
         return Inertia::render('Home', [
@@ -80,8 +92,62 @@ class PasteController extends Controller
 
     public function show(string $slug)
     {
+        return $this->renderPaste(Paste::where('slug', $slug)->firstOrFail());
+    }
+
+    /**
+     * Resolve a paste from its short code.
+     *
+     * The paste renders in place rather than redirecting to /p/{slug}. A
+     * redirect would work -- browsers reattach the fragment when the target has
+     * none -- but it would swap the short URL in the address bar for the long
+     * one, which defeats the point of having typed the short one.
+     */
+    public function showByShortCode(string $code)
+    {
+        $paste = Paste::where('short_code', $code)->firstOrFail();
+
+        return $this->renderPaste($paste);
+    }
+
+    /**
+     * Mint a short code for a paste, or hand back the one it already has.
+     *
+     * Owner-only. A short code is a second, much shorter address for the paste,
+     * so letting any viewer mint one would let a stranger downgrade someone
+     * else's 16-character slug to a 6-character handle.
+     */
+    public function createShortLink(string $slug)
+    {
         $paste = Paste::where('slug', $slug)->firstOrFail();
 
+        if ($paste->isExpired()) {
+            $paste->delete();
+            abort(404, 'This paste has expired.');
+        }
+
+        if (!$paste->isOwnedByViewer()) {
+            abort(403, 'Only the paste owner can create a short link.');
+        }
+
+        // Reused rather than regenerated: a second code would leave the first
+        // live but forgotten, and hand the owner a different link every press.
+        if (!$paste->short_code) {
+            $paste->update(['short_code' => $this->generateUniqueShortCode()]);
+        }
+
+        return response()->json([
+            'short_code' => $paste->short_code,
+            'short_url' => url('/s/'.$paste->short_code),
+        ]);
+    }
+
+    /**
+     * Render a paste that has already been resolved, whichever address it
+     * arrived by. Everything here is keyed off the paste, not the URL.
+     */
+    private function renderPaste(Paste $paste)
+    {
         if ($paste->isExpired()) {
             $paste->delete();
             abort(404, 'This paste has expired.');
@@ -106,8 +172,7 @@ class PasteController extends Controller
         }
 
         // Determine if the viewer is the owner (authenticated owner or anonymous creator via session)
-        $isOwner = (auth()->check() && auth()->id() === $paste->user_id)
-            || session("paste_creator_{$paste->slug}", false);
+        $isOwner = $paste->isOwnedByViewer();
 
         // Increment views
         $paste->increment('views');
@@ -115,6 +180,9 @@ class PasteController extends Controller
         $response = Inertia::render('PasteView', [
             'paste' => [
                 'slug' => $paste->slug,
+                // Only the path. The content key lives in the fragment and is
+                // appended in the browser, which is the only place it exists.
+                'short_url' => $paste->short_code ? url('/s/'.$paste->short_code) : null,
                 'title' => $paste->title,
                 'content' => $paste->content,
                 'encryption_version' => $paste->encryption_version,
@@ -169,10 +237,7 @@ class PasteController extends Controller
             abort(403);
         }
 
-        $isOwner = (auth()->check() && auth()->id() === $paste->user_id)
-            || session("paste_creator_{$paste->slug}", false);
-
-        if (!$isOwner) {
+        if (!$paste->isOwnedByViewer()) {
             $paste->delete();
         }
 
@@ -377,5 +442,19 @@ class PasteController extends Controller
         } while (Paste::where('slug', $slug)->exists());
 
         return $slug;
+    }
+
+    private function generateUniqueShortCode(): string
+    {
+        $max = strlen(self::SHORT_CODE_ALPHABET) - 1;
+
+        do {
+            $code = '';
+            for ($i = 0; $i < self::SHORT_CODE_LENGTH; $i++) {
+                $code .= self::SHORT_CODE_ALPHABET[random_int(0, $max)];
+            }
+        } while (Paste::where('short_code', $code)->exists());
+
+        return $code;
     }
 }
