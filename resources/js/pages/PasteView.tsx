@@ -17,9 +17,14 @@ import {
     consumePendingKey,
     decryptWithFragmentKey,
     decryptWithPassword,
+    decryptWithShortCode,
     DecryptionError,
+    generateShortCode,
+    importFragmentKey,
     isCryptoAvailable,
     readKeyFromFragment,
+    readShortCodeFromPath,
+    wrapCekForShortCode,
     writeKeyToFragment,
 } from '@/lib/crypto';
 import type { Paste, PageProps } from '@/types';
@@ -92,7 +97,7 @@ export default function PasteView({ paste }: PasteViewProps) {
         () => readKeyFromFragment() ?? claimKeyForNewPaste(),
     );
     const [password, setPassword] = useState('');
-    const [shortUrl, setShortUrl] = useState<string | null>(paste.short_url);
+    const [shortUrl, setShortUrl] = useState<string | null>(null);
     const [shortCopied, setShortCopied] = useState(false);
     const [shortPending, setShortPending] = useState(false);
     const [shortError, setShortError] = useState<string | null>(null);
@@ -133,6 +138,24 @@ export default function PasteView({ paste }: PasteViewProps) {
         let active = true;
 
         (async () => {
+            // Arrived by short link: the code in the path unwraps the key, so
+            // there is no fragment to wait for and nothing to ask the viewer.
+            const shortCode = readShortCodeFromPath();
+            if (paste.short_meta && shortCode) {
+                try {
+                    const content = await decryptWithShortCode(
+                        paste.content,
+                        meta,
+                        paste.short_meta,
+                        shortCode,
+                    );
+                    if (active) setDecryption({ status: 'ready', content });
+                } catch (error) {
+                    if (active) setDecryption({ status: 'failed', message: describeFailure(error) });
+                }
+                return;
+            }
+
             // Storage-blocked tabs fall through to the create page's own fragment
             // write, which lands shortly after mount. Only a paste created in
             // this tab can be waiting on it, so nothing else pays for the wait.
@@ -208,36 +231,86 @@ export default function PasteView({ paste }: PasteViewProps) {
     };
 
     /**
-     * Copy the short link, minting one on first use.
+     * Mint a short link and copy it.
      *
-     * The server mints only the /s/{code} half. The decryption key has never
-     * left this browser and is not part of what was minted, so it is reattached
-     * here -- exactly as buildShareUrl does for the long URL.
+     * The whole point is that the result is six characters with nothing after
+     * it, so the content key cannot ride along in a fragment. Instead the code
+     * becomes the key: this browser generates it, wraps the content key under
+     * PBKDF2(code), and sends only the wrapped bytes. The code is never
+     * transmitted in a form the server keeps -- it is hashed on arrival.
+     *
+     * A paste already locked by a password needs none of this. It has no
+     * fragment to shed, so its short code is a plain alias and the reader is
+     * still asked for the password.
      */
     const copyShortLink = async () => {
         if (shortPending) return;
 
-        let target = shortUrl;
+        if (shortUrl) {
+            await navigator.clipboard.writeText(shortUrl);
+            setShortCopied(true);
+            setTimeout(() => setShortCopied(false), 2000);
+            return;
+        }
 
-        if (!target) {
-            setShortPending(true);
-            setShortError(null);
-            try {
-                const response = await apiFetch(`/p/${paste.slug}/short-link`, { method: 'POST' });
-                if (!response.ok) throw new Error(String(response.status));
-                target = (await response.json()).short_url as string;
-                setShortUrl(target);
-            } catch {
-                setShortError('Could not create a short link.');
+        setShortPending(true);
+        setShortError(null);
+
+        let target: string;
+
+        try {
+            const code = generateShortCode();
+
+            // Only a fragment-mode paste has a key that needs somewhere to go.
+            let shortMeta = null;
+            if (paste.is_encrypted && paste.encryption_meta?.mode === 'fragment') {
+                if (!fragmentKey) {
+                    setShortError('The decryption key is missing from this URL.');
+                    setShortPending(false);
+                    return;
+                }
+                shortMeta = await wrapCekForShortCode(await importFragmentKey(fragmentKey), code);
+            }
+
+            const response = await apiFetch(`/p/${paste.slug}/short-link`, {
+                method: 'POST',
+                body: JSON.stringify({ short_code: code, short_meta: shortMeta }),
+            });
+
+            if (!response.ok) {
+                setShortError(
+                    response.status === 409
+                        ? 'That code was taken — press again.'
+                        : 'Could not create a short link.',
+                );
                 setShortPending(false);
                 return;
             }
+
+            target = (await response.json()).short_url as string;
+        } catch {
+            setShortError('Could not create a short link.');
             setShortPending(false);
+            return;
         }
 
-        await navigator.clipboard.writeText(fragmentKey ? `${target}#k=${fragmentKey}` : target);
-        setShortCopied(true);
-        setTimeout(() => setShortCopied(false), 2000);
+        // Shown on screen before anything else is attempted. Only the hash of
+        // the code was stored, so this is the one moment it exists anywhere
+        // outside this component -- a failed clipboard write must not be able
+        // to lose it.
+        setShortUrl(target);
+        setShortPending(false);
+
+        // Deriving the key takes about a second, which is long enough for the
+        // click's transient activation to lapse; some browsers then refuse the
+        // write. That costs the convenience, not the link.
+        try {
+            await navigator.clipboard.writeText(target);
+            setShortCopied(true);
+            setTimeout(() => setShortCopied(false), 2000);
+        } catch {
+            setShortError('Short link created — copy it from the box below.');
+        }
     };
 
     const formatDate = (dateStr: string) => {
@@ -332,7 +405,7 @@ export default function PasteView({ paste }: PasteViewProps) {
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
-                        {(paste.is_owner || shortUrl) && (
+                        {paste.is_owner && (
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -356,9 +429,9 @@ export default function PasteView({ paste }: PasteViewProps) {
                                     <TooltipContent>
                                         {shortError
                                             ? shortError
-                                            : fragmentKey
-                                              ? 'Copy a short link — the decryption key is still appended'
-                                              : 'Copy a short, typeable link to this paste'}
+                                            : paste.has_short_link && !shortUrl
+                                              ? 'This paste already has a short link. Creating another replaces it — the old one stops working.'
+                                              : 'Create a short, typeable link — six characters, nothing after it'}
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
@@ -426,6 +499,27 @@ export default function PasteView({ paste }: PasteViewProps) {
                         </span>
                     )}
                 </div>
+
+                {/*
+                  * The short link, shown because it cannot be looked up again.
+                  * The server keeps only an HMAC of the code, so if this box is
+                  * dismissed without the link being saved the only way back is
+                  * minting a new one -- which retires this one.
+                  */}
+                {shortUrl && (
+                    <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center">
+                        <span className="text-sm text-muted-foreground">Short link</span>
+                        <Input
+                            readOnly
+                            value={shortUrl}
+                            onFocus={event => event.currentTarget.select()}
+                            className="font-mono text-sm sm:max-w-xs"
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            Save this now — it cannot be shown again.
+                        </span>
+                    </div>
+                )}
 
                 {/* Code block / Markdown preview -- never the ciphertext */}
                 {decryption.status === 'ready' && (

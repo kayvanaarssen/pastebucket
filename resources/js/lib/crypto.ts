@@ -9,6 +9,15 @@
  *   password mode - the CEK is wrapped with a key derived from the paste
  *                   password via PBKDF2, and the wrapped bytes are stored
  *                   server-side. The password itself is never sent.
+ *   short-link    - the CEK is wrapped under a generated 6-character code that
+ *                   is the whole link (/s/{code}), so nothing trails the URL.
+ *                   Mechanically password mode with a code this app generates.
+ *
+ * Short-link mode is the one place a secret travels in the request path rather
+ * than the fragment, so the server sees it and a compromised server can derive
+ * the key. It also shrinks the secret from 2^256 to roughly 2^34 behind 600k
+ * PBKDF2 iterations. That buys a link short enough to read aloud; a paste that
+ * cannot afford the trade should keep its fragment link.
  *
  * Wrapping the CEK rather than deriving it straight from the password means a
  * password change re-wraps 32 bytes instead of re-encrypting the whole paste,
@@ -243,6 +252,119 @@ export async function decryptWithCek(
     } catch {
         throw new DecryptionError();
     }
+}
+
+/* -------------------------------------------------------------------------- */
+/* short links                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Alphabet for short codes, matching the one the shortlinker project uses.
+ * Every ambiguous glyph is gone (0/O/o, 1/l/I, and f, heard as "s") so a code
+ * survives being read aloud.
+ */
+const SHORT_CODE_ALPHABET = 'abcdegjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+export const SHORT_CODE_LENGTH = 6;
+
+/**
+ * Wrapping parameters for a short link. Same shape as password mode, because a
+ * short code *is* a password -- one this app generates instead of the user.
+ */
+export interface ShortLinkEnvelope {
+    salt: string;
+    iterations: number;
+    wrapped_key: string;
+    wrap_iv: string;
+}
+
+/**
+ * Generate a short code with rejection sampling.
+ *
+ * 256 is not a multiple of 52, so plain modulo would make the first twelve
+ * letters of the alphabet measurably likelier than the rest. On a secret worth
+ * only ~2^34 to begin with, throwing away that much of the space is not
+ * affordable -- bytes that land in the biased tail are discarded instead.
+ */
+export function generateShortCode(length: number = SHORT_CODE_LENGTH): string {
+    const size = SHORT_CODE_ALPHABET.length;
+    const limit = Math.floor(256 / size) * size;
+    let code = '';
+
+    while (code.length < length) {
+        for (const byte of randomBytes(length * 2)) {
+            if (byte >= limit) continue;
+            code += SHORT_CODE_ALPHABET[byte % size];
+            if (code.length === length) break;
+        }
+    }
+
+    return code;
+}
+
+/**
+ * Wrap an existing content key under a short code.
+ *
+ * This is what lets `/s/{code}` be the entire link: the key rides in the code
+ * rather than in a fragment beside it. The server stores only the wrapped
+ * bytes, so a database dump is still ciphertext.
+ *
+ * The honest cost, stated where it is implemented: a 6-character code is about
+ * 2^34, not the 2^256 a fragment key carries, and unlike a fragment the code
+ * travels in the request path -- so the server sees it, and a compromised
+ * server can derive the key. PBKDF2 at 600k iterations is what stands between
+ * a stolen database and the content.
+ */
+export async function wrapCekForShortCode(
+    cek: CryptoKey,
+    code: string,
+): Promise<ShortLinkEnvelope> {
+    const salt = randomBytes(SALT_BYTES);
+    const wrapIv = randomBytes(IV_BYTES);
+    const kek = await deriveKek(code, salt, PBKDF2_ITERATIONS);
+    const wrapped = await crypto.subtle.wrapKey('raw', cek, kek, {
+        name: 'AES-GCM',
+        iv: wrapIv as BufferSource,
+    });
+
+    return {
+        salt: toBase64Url(salt),
+        iterations: PBKDF2_ITERATIONS,
+        wrapped_key: toBase64Url(new Uint8Array(wrapped)),
+        wrap_iv: toBase64Url(wrapIv),
+    };
+}
+
+/**
+ * Read the code back out of `/s/{code}`.
+ *
+ * Unlike a fragment this *is* sent to the server, which is the trade the short
+ * link makes. It is read from the path rather than passed through props so the
+ * server never has to echo it back.
+ */
+export function readShortCodeFromPath(): string | null {
+    const match = window.location.pathname.match(/^\/s\/([A-Za-z0-9]+)\/?$/);
+    return match ? match[1] : null;
+}
+
+/** Decrypt a short-linked paste using the code from the URL path. */
+export async function decryptWithShortCode(
+    ciphertext: string,
+    contentMeta: EncryptionMeta,
+    envelope: ShortLinkEnvelope,
+    code: string,
+): Promise<string> {
+    // unwrapCekWithPassword is mode-agnostic: it wants wrapping parameters, and
+    // a short code is just a generated password. Its failure message is not --
+    // a viewer who mistyped a link was never shown a password to get wrong.
+    let cek: CryptoKey;
+    try {
+        cek = await unwrapCekWithPassword(code, { ...contentMeta, ...envelope });
+    } catch {
+        throw new DecryptionError('This short link is not valid.');
+    }
+
+    return decryptWithCek(ciphertext, contentMeta, cek);
 }
 
 /** Decrypt a fragment-mode paste using the key from the URL fragment. */

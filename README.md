@@ -22,7 +22,7 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 - **Configurable Expiry** - Guests: 1 hour to 7 days. Logged-in users: up to 365 days. Defaults configurable via `.env`.
 - **Visibility Controls** - Public, unlisted, or private (login required) pastes.
 - **Secure URLs** - 16-character random slugs for unpredictable paste URLs.
-- **Short Links** - The paste owner can mint a 6-character alias at `/s/{code}`, short enough to read out or type by hand. The alphabet drops every ambiguous glyph (`0`/`O`/`o`, `1`/`l`/`I`, `f`). For a password-protected paste the short link is the whole link. For a link-key paste the decryption key is still appended in the browser as `#k=...`, so the URL is shorter but not fully typeable - the key never reaches the server either way.
+- **Short Links** - The paste owner can mint a 6-character link at `/s/{code}` with nothing after it, short enough to read down a phone line. The alphabet drops every ambiguous glyph (`0`/`O`/`o`, `1`/`l`/`I`, `f`). The code is the key: the browser wraps the paste's content key under it and the server stores only the wrapped bytes plus an HMAC of the code, never the code itself. See [Short links and what they cost](#short-links-and-what-they-cost).
 - **No Character Limit** - Designed for sharing long code snippets with preserved structure.
 - **Registration Control** - Registration disabled by default. Enable permanently or temporarily (15 min to 24 hours) from the admin panel. Auto-disables when the window expires.
 - **User Invites** - Admins can create secure, single-use invite links from the user management page. Invitees pick their own password (10+ chars, mixed case, number, symbol) and can add a passkey afterwards. Invites can be emailed automatically with a branded HTML template, copied manually, resent, or revoked. Configurable expiry from 1 hour to 30 days.
@@ -44,6 +44,39 @@ Each paste gets a random 256-bit content key (CEK) and is encrypted with AES-GCM
 ### What this protects against
 
 A database dump, a stolen backup, or an operator reading pastes directly out of storage. Someone with full database access sees ciphertext and non-secret parameters (IV, salt, iteration count) — not content.
+
+### Short links and what they cost
+
+A short link is the one place this app trades encryption strength for
+convenience, so it is worth being precise about the trade.
+
+A normal paste link carries a 256-bit key in the URL fragment, which browsers
+never transmit. A short link has no fragment - that is the point - so the key
+travels wrapped under the 6-character code instead, and the code sits in the
+request path. That means:
+
+- **A stolen database is still safe.** The code is not stored. What is stored is
+  the content key wrapped under PBKDF2-HMAC-SHA256 at 600,000 iterations, plus
+  an HMAC of the code keyed on `APP_KEY`, which lives in the environment rather
+  than the database. An attacker holding only a dump has no code to try.
+- **The server sees the code.** Unlike a fragment, the path reaches the server on
+  every request. An operator who logs URLs, or an attacker who has compromised
+  the server, can derive the key. A fragment link does not have this exposure.
+- **The secret is much smaller.** Six characters from a 52-character alphabet is
+  about 2^34, against 2^256 for a fragment key. The 600,000 PBKDF2 iterations are
+  what stand between that and an offline attack.
+- **The wrapped key is only served to someone who presented a code.** It is
+  withheld from `/p/{slug}`, so holding the slug alone does not let you attack
+  the code offline.
+
+Short links are opt-in and owner-only. A paste that cannot afford this should
+keep its full-length fragment link, which is unchanged. Minting a second short
+link replaces the first, and the old one stops working - only its hash was ever
+stored, so it cannot be kept alive.
+
+For a password-protected paste none of this applies: it has no fragment to shed,
+so its short code is a plain alias and the reader is still asked for the
+password.
 
 ### What it does not protect against
 

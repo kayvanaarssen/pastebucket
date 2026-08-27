@@ -96,6 +96,20 @@ class PasteController extends Controller
     }
 
     /**
+     * Look a short code up by its HMAC.
+     *
+     * The code itself is never stored. It is the password that unwraps the
+     * content key, so keeping it beside the wrapped key would put both halves in
+     * the same database dump. The HMAC is keyed on APP_KEY, which lives in the
+     * environment rather than the database -- enough to resolve a paste, useless
+     * to someone holding only a copy of the table.
+     */
+    private static function hashShortCode(string $code): string
+    {
+        return hash_hmac('sha256', $code, config('app.key'));
+    }
+
+    /**
      * Resolve a paste from its short code.
      *
      * The paste renders in place rather than redirecting to /p/{slug}. A
@@ -105,9 +119,9 @@ class PasteController extends Controller
      */
     public function showByShortCode(string $code)
     {
-        $paste = Paste::where('short_code', $code)->firstOrFail();
+        $paste = Paste::where('short_code_hash', self::hashShortCode($code))->firstOrFail();
 
-        return $this->renderPaste($paste);
+        return $this->renderPaste($paste, viaShortCode: true);
     }
 
     /**
@@ -117,7 +131,7 @@ class PasteController extends Controller
      * so letting any viewer mint one would let a stranger downgrade someone
      * else's 16-character slug to a 6-character handle.
      */
-    public function createShortLink(string $slug)
+    public function createShortLink(Request $request, string $slug)
     {
         $paste = Paste::where('slug', $slug)->firstOrFail();
 
@@ -130,15 +144,38 @@ class PasteController extends Controller
             abort(403, 'Only the paste owner can create a short link.');
         }
 
-        // Reused rather than regenerated: a second code would leave the first
-        // live but forgotten, and hand the owner a different link every press.
-        if (!$paste->short_code) {
-            $paste->update(['short_code' => $this->generateUniqueShortCode()]);
+        $validated = $request->validate([
+            // Generated in the browser, because for an encrypted paste it is the
+            // password that wraps the content key -- the server only ever sees
+            // it in order to hash it, and stores the hash.
+            'short_code' => ['required', 'string', 'size:'.self::SHORT_CODE_LENGTH, 'regex:/^['.self::SHORT_CODE_ALPHABET.']+$/'],
+            // Absent for password-mode and legacy pastes: those have nothing to
+            // wrap, so their short code is a plain alias.
+            'short_meta' => 'nullable|array',
+            'short_meta.salt' => 'required_with:short_meta|string|max:64',
+            'short_meta.iterations' => 'required_with:short_meta|integer|min:100000|max:10000000',
+            'short_meta.wrapped_key' => 'required_with:short_meta|string|max:256',
+            'short_meta.wrap_iv' => 'required_with:short_meta|string|max:64',
+        ]);
+
+        $hash = self::hashShortCode($validated['short_code']);
+
+        // A collision means someone else's paste already answers to this code.
+        // The browser holds the only copy of it, so it has to mint another.
+        if (Paste::where('short_code_hash', $hash)->where('id', '!=', $paste->id)->exists()) {
+            return response()->json(['message' => 'That code is taken.'], 409);
         }
 
+        // Overwrites any previous code. The old one cannot be recovered to be
+        // kept alive -- only its hash was ever stored -- so it stops working,
+        // which the UI says before the owner presses the button.
+        $paste->update([
+            'short_code_hash' => $hash,
+            'short_meta' => $validated['short_meta'] ?? null,
+        ]);
+
         return response()->json([
-            'short_code' => $paste->short_code,
-            'short_url' => url('/s/'.$paste->short_code),
+            'short_url' => url('/s/'.$validated['short_code']),
         ]);
     }
 
@@ -146,7 +183,7 @@ class PasteController extends Controller
      * Render a paste that has already been resolved, whichever address it
      * arrived by. Everything here is keyed off the paste, not the URL.
      */
-    private function renderPaste(Paste $paste)
+    private function renderPaste(Paste $paste, bool $viaShortCode = false)
     {
         if ($paste->isExpired()) {
             $paste->delete();
@@ -180,9 +217,14 @@ class PasteController extends Controller
         $response = Inertia::render('PasteView', [
             'paste' => [
                 'slug' => $paste->slug,
-                // Only the path. The content key lives in the fragment and is
-                // appended in the browser, which is the only place it exists.
-                'short_url' => $paste->short_code ? url('/s/'.$paste->short_code) : null,
+                // Whether one exists -- never which. The code is unrecoverable
+                // from its hash, so the owner copies it at mint time or re-mints.
+                'has_short_link' => $paste->short_code_hash !== null,
+                // The wrapping parameters go only to a viewer who already
+                // presented a code. Serving them on /p/{slug} would hand anyone
+                // holding the slug the material to brute-force a 2^34 code
+                // offline, which is the one thing the short link cannot afford.
+                'short_meta' => $viaShortCode ? $paste->short_meta : null,
                 'title' => $paste->title,
                 'content' => $paste->content,
                 'encryption_version' => $paste->encryption_version,
@@ -442,19 +484,5 @@ class PasteController extends Controller
         } while (Paste::where('slug', $slug)->exists());
 
         return $slug;
-    }
-
-    private function generateUniqueShortCode(): string
-    {
-        $max = strlen(self::SHORT_CODE_ALPHABET) - 1;
-
-        do {
-            $code = '';
-            for ($i = 0; $i < self::SHORT_CODE_LENGTH; $i++) {
-                $code .= self::SHORT_CODE_ALPHABET[random_int(0, $max)];
-            }
-        } while (Paste::where('short_code', $code)->exists());
-
-        return $code;
     }
 }

@@ -19,11 +19,20 @@ export interface EncryptionMeta {
     wrap_iv?: string;
 }
 
+export interface ShortLinkEnvelope {
+    salt: string;
+    iterations: number;
+    wrapped_key: string;
+    wrap_iv: string;
+}
+
 export interface Paste {
     id?: number;
     slug: string;
-    /** Short-link URL without a fragment; null until the owner mints one. */
-    short_url: string | null;
+    /** Whether a short link exists. The code itself is unrecoverable server-side. */
+    has_short_link: boolean;
+    /** Wrapping parameters for the short code. Sent only when arriving via /s/. */
+    short_meta: ShortLinkEnvelope | null;
     title: string | null;
     /** Ciphertext when is_encrypted, plaintext for legacy pastes. */
     content: string;

@@ -15,7 +15,8 @@ class Paste extends Model
      */
     protected $fillable = [
         'slug',
-        'short_code',
+        'short_code_hash',
+        'short_meta',
         'user_id',
         'title',
         'content',
@@ -51,6 +52,7 @@ class Paste extends Model
             'expires_at' => 'datetime',
             'burn_after_read' => 'boolean',
             'encryption_meta' => 'array',
+            'short_meta' => 'array',
         ];
     }
 
