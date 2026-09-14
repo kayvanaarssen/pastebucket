@@ -15,6 +15,7 @@ use Laravel\Passport\ClientRepository;
 use Laravel\Passport\Passport;
 use Laravel\Passport\Token;
 use Tests\Support\DecryptsWithCryptoCore;
+use Tests\Support\UsesTemporaryPassportKeys;
 use Tests\TestCase;
 
 /**
@@ -23,7 +24,7 @@ use Tests\TestCase;
  */
 class RemoteMcpTest extends TestCase
 {
-    use DecryptsWithCryptoCore, RefreshDatabase;
+    use DecryptsWithCryptoCore, RefreshDatabase, UsesTemporaryPassportKeys;
 
     private const DOCUMENT = "# Advies Fictief BV\n\nBeste Jan, het **volledige advies**:\n\n| Fase | Kosten |\n| --- | ---: |\n| Migratie | 4.750 |\n\n```bash\n\tindented  \n```\n  trailing spaces stay  \n";
 
@@ -285,26 +286,4 @@ class RemoteMcpTest extends TestCase
         $this->app['auth']->shouldUse('web');
     }
 
-    /**
-     * Personal-access tokens are real signed JWTs. Sign them with throwaway
-     * keys so the test never touches (or depends on) the app's own keys.
-     */
-    private function useTemporaryPassportKeys(): void
-    {
-        $dir = sys_get_temp_dir().'/pastebucket-passport-'.getmypid();
-
-        if (! is_file("{$dir}/oauth-private.key")) {
-            @mkdir($dir, 0700, true);
-            $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
-            openssl_pkey_export($key, $private);
-            file_put_contents("{$dir}/oauth-private.key", $private);
-            file_put_contents("{$dir}/oauth-public.key", openssl_pkey_get_details($key)['key']);
-        }
-
-        // league/oauth2-server refuses group- or world-writable key files.
-        chmod("{$dir}/oauth-private.key", 0600);
-        chmod("{$dir}/oauth-public.key", 0600);
-
-        Passport::loadKeysFrom($dir);
-    }
 }

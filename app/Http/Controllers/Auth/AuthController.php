@@ -27,7 +27,12 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect()->intended(route('home'));
+
+            // The page that sent the user here may not be an Inertia page --
+            // the OAuth consent screen a connecting app (ChatGPT, Claude) opens
+            // is plain Blade. Inertia::location makes the browser do a full
+            // visit instead of an XHR that could not render it.
+            return Inertia::location(redirect()->intended(route('home'))->getTargetUrl());
         }
 
         return back()->withErrors([

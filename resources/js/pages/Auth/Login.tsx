@@ -31,7 +31,9 @@ export default function Login() {
 
         const result = await verifyRes.json();
         if (verifyRes.ok && result.redirect) {
-            router.visit(result.redirect);
+            // A full navigation: the target can be a non-Inertia page, such as
+            // the OAuth consent screen a connecting app sent the user to.
+            window.location.assign(result.redirect);
         } else {
             setPasskeyError(result.error || 'Authentication failed.');
         }

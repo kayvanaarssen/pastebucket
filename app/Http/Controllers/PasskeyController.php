@@ -201,7 +201,15 @@ class PasskeyController extends Controller
         Auth::login($passkey->user, true);
         $request->session()->regenerate();
 
-        return response()->json(['redirect' => '/']);
+        // Send them back where the login interrupted them -- e.g. an OAuth
+        // consent screen a connecting app opened -- instead of always home.
+        // Only same-origin targets, so the intended URL cannot become an
+        // open redirect.
+        $intended = (string) $request->session()->pull('url.intended', '/');
+        $sameOrigin = str_starts_with($intended, '/') && ! str_starts_with($intended, '//')
+            || parse_url($intended, PHP_URL_HOST) === $request->getHost();
+
+        return response()->json(['redirect' => $sameOrigin ? $intended : '/']);
     }
 
     /**
