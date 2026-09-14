@@ -17,6 +17,7 @@ class ProfileController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->get(),
             'api_tokens' => ApiTokenController::tokensFor($request),
+            'connected_apps' => ConnectedAppController::appsFor($request),
             'api_token_options' => [
                 'abilities' => collect(ApiTokenController::ABILITIES)
                     ->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])

@@ -34,6 +34,12 @@ the server.**
    If the cronjob is missing, add it. Expired and revoked links are refused
    either way, but rows are only cleaned up by the scheduler.
 
+5. **Only for the ChatGPT connection:** after the first deploy that includes
+   Passport, create the OAuth signing keys once on the server with
+   `php artisan passport:keys`. They land in `storage/`, which persists
+   between deploys. Do not regenerate them on every deploy, or every connected
+   app has to reconnect. Full steps: [chatgpt.md](chatgpt.md).
+
 ## 2. Environment (optional)
 
 All new settings have safe defaults. Add them to `.env` only to change a default.
@@ -45,6 +51,7 @@ PASTE_API_PUBLISH_PER_MINUTE=20
 PASTE_API_REQUESTS_PER_MINUTE=120
 PASTE_API_TOKEN_MAX_DAYS=365
 PASTE_API_REVOKED_RETENTION_DAYS=30
+MCP_REDIRECT_DOMAINS=https://chatgpt.com/  # OAuth redirect targets allowed to register (ChatGPT only by default)
 ```
 
 No Sanctum stateful-domain configuration is needed. The API accepts tokens

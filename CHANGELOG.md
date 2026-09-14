@@ -6,6 +6,8 @@ All notable changes to PasteBucket will be documented in this file.
 
 ### Added
 
+- **ChatGPT connection** — hosted MCP endpoint `/mcp` (laravel/mcp) with OAuth 2.1 via Passport, dynamic client registration limited to allowed redirect domains, consent screen, and a *Connected Apps* card to disconnect. Content published this way is encrypted on the server with a PHP port of the browser scheme, interop-tested against `crypto-core.ts`
+
 - **Formatted text editor** — an optional visual editor next to the (still default) code editor, with headings, bold/italic/strikethrough, lists, checklists, links, quotes, tables, inline code, code blocks and undo/redo; cleaned-up pasting from ChatGPT, Claude and Word; explicit Markdown import; warnings with cancel before any lossy conversion
 - **Document view** — `markdown` pastes render as a readable, mobile-friendly document with a Source toggle, a clearly shown expiry moment, copy buttons and no remote image loading
 - Explicit `content_format` (`code` | `markdown`) per paste; existing pastes are `code` and untouched

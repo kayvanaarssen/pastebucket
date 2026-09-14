@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ApiTokenController;
+use App\Http\Controllers\ConnectedAppController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InviteController;
@@ -44,6 +45,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile/tokens/{token}', [ApiTokenController::class, 'destroy'])
         ->whereNumber('token')
         ->name('profile.tokens.destroy');
+
+    // OAuth apps connected to the remote MCP endpoint (e.g. ChatGPT).
+    Route::delete('/profile/connected-apps/{client}', [ConnectedAppController::class, 'destroy'])
+        ->where('client', '[A-Za-z0-9-]{1,64}')
+        ->name('profile.connected-apps.destroy');
 
     // Passkey management (authenticated)
     Route::get('/passkeys', [PasskeyController::class, 'index']);

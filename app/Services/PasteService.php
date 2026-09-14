@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Paste;
-use App\Models\User;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Str;
 
 /**
@@ -16,7 +16,7 @@ class PasteService
      * The longest expiry this account may set, in hours. Tokens always belong
      * to a user, so the API is held to the same limit as a logged-in browser.
      */
-    public function maxExpiryHoursFor(?User $user): int
+    public function maxExpiryHoursFor(?Authenticatable $user): int
     {
         return (int) ($user
             ? config('pastebucket.user_max_expiry_hours')

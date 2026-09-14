@@ -36,6 +36,12 @@ return Application::configure(basePath: dirname(__DIR__))
             );
         }
 
+        // MCP tool arguments are published byte for byte. The global input
+        // normalisers would trim leading/trailing whitespace off a document
+        // and turn an empty title into null before the tool ever saw it.
+        $middleware->trimStrings(except: [fn (Request $request) => $request->is('mcp')]);
+        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('mcp')]);
+
         $middleware->alias([
             'abilities' => CheckAbilities::class,
             'shared-content' => SharedContentHeaders::class,
@@ -46,7 +52,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // redirect to /login for a missing token would be followed by curl or
         // fetch and look like success.
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
+            fn (Request $request) => $request->is('api/*', 'mcp', 'oauth/register') || $request->expectsJson(),
         );
 
         // Sanctum's MissingAbilityException is an AuthorizationException, which

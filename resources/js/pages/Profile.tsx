@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, Check, Copy, Fingerprint, KeyRound, Plus, Terminal, Trash2, User, Lock } from 'lucide-react';
+import { AlertTriangle, Bot, Check, Copy, Fingerprint, KeyRound, Plus, Terminal, Trash2, Unlink, User, Lock } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { apiFetch } from '@/lib/api';
@@ -40,6 +40,14 @@ interface ProfileProps extends PageProps {
     passkeys: PasskeyInfo[];
     api_tokens: ApiTokenInfo[];
     api_token_options: ApiTokenOptions;
+    connected_apps: ConnectedAppInfo[];
+}
+
+interface ConnectedAppInfo {
+    id: string;
+    name: string;
+    connected_at: string | null;
+    last_authorized_at: string | null;
 }
 
 /** Laravel validation answers carry per-field arrays; show the first one. */
@@ -298,7 +306,97 @@ function ApiTokensCard({ tokens, options }: { tokens: ApiTokenInfo[]; options: A
     );
 }
 
-export default function Profile({ passkeys: initialPasskeys, api_tokens, api_token_options }: ProfileProps) {
+/**
+ * OAuth apps (ChatGPT and the like) approved for the remote MCP endpoint.
+ * Disconnecting revokes their access and refresh tokens at once.
+ */
+function ConnectedAppsCard({ apps }: { apps: ConnectedAppInfo[] }) {
+    const [disconnect, setDisconnect] = useState<ConnectedAppInfo | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, setPending] = useState(false);
+
+    const formatDate = (dateStr: string | null) =>
+        dateStr ? new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'unknown';
+
+    const confirmDisconnect = async () => {
+        if (!disconnect || pending) return;
+        setPending(true);
+        setError(null);
+        try {
+            const res = await apiFetch(`/profile/connected-apps/${encodeURIComponent(disconnect.id)}`, { method: 'DELETE' });
+            if (!res.ok) {
+                setError(firstError(await res.json().catch(() => null)) ?? 'Could not disconnect the app.');
+                return;
+            }
+            setDisconnect(null);
+        } catch {
+            setError('Could not disconnect the app.');
+        } finally {
+            setPending(false);
+            router.reload({ only: ['connected_apps'] });
+        }
+    };
+
+    return (
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Bot className="h-5 w-5" />
+                        Connected Apps
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        Assistants such as ChatGPT that you allowed to publish to your account. Documents they publish
+                        reach the server as plain text and are encrypted there.
+                    </p>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                    {error && !disconnect && <p className="text-sm text-destructive">{error}</p>}
+                    {apps.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No apps connected.</p>
+                    ) : (
+                        apps.map(app => (
+                            <div key={app.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium">{app.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Connected {formatDate(app.connected_at)} &middot; last authorized {formatDate(app.last_authorized_at)}
+                                    </p>
+                                </div>
+                                <Button variant="outline" size="sm" className="shrink-0" onClick={() => { setError(null); setDisconnect(app); }}>
+                                    <Unlink className="mr-1.5 h-4 w-4" />
+                                    Disconnect
+                                </Button>
+                            </div>
+                        ))
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog open={disconnect !== null} onOpenChange={open => { if (!open) setDisconnect(null); }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Disconnect {disconnect?.name}</DialogTitle>
+                        <DialogDescription>
+                            It can no longer publish, check or revoke pastes until you approve it again. Pastes it already
+                            published stay online until they expire.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDisconnect(null)}>Cancel</Button>
+                        <Button variant="destructive" onClick={confirmDisconnect} disabled={pending}>
+                            <Unlink className="mr-1.5 h-4 w-4" />
+                            Disconnect
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
+export default function Profile({ passkeys: initialPasskeys, api_tokens, api_token_options, connected_apps }: ProfileProps) {
     const { auth } = usePage<PageProps>().props;
 
     const profileForm = useForm({
@@ -532,6 +630,8 @@ export default function Profile({ passkeys: initialPasskeys, api_tokens, api_tok
                 )}
 
                 <ApiTokensCard tokens={api_tokens} options={api_token_options} />
+
+                <ConnectedAppsCard apps={connected_apps} />
             </div>
 
             <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>

@@ -256,6 +256,12 @@ PHP/nginx.
 `crypto.ts` adds only the browser-specific parts (URL fragment, sessionStorage).
 There is no new protocol.
 
+**Exception: the hosted MCP endpoint for ChatGPT.** Documents published through
+`/mcp` are encrypted on the server with a PHP port of the same scheme
+(`app/Support/ServerSideEncryption.php`, interop-tested against
+`crypto-core.ts`). Everything below about what the server never receives does
+not hold for that route. See [chatgpt.md](chatgpt.md).
+
 **Fragment links by default:**
 
 ```
@@ -356,8 +362,15 @@ Installation, Claude Code and Codex configuration, and usage examples (one
 answer, a transcript file, password mode, status, revocation, recovery data) are
 in [`mcp/README.md`](../mcp/README.md).
 
-Out of scope for this version:
-- a publicly hosted MCP server
-- integration with browser-based ChatGPT or Claude
+### ChatGPT (hosted MCP endpoint)
+
+ChatGPT cannot run a local stdio server. It connects to the hosted endpoint
+`/mcp` with OAuth 2.1 instead. **On that route the server receives the plaintext
+and encrypts it itself**, so the guarantees in §4 do not apply to documents
+published through it. Setup, the trust model and disconnecting are described
+in [`docs/chatgpt.md`](chatgpt.md).
+
+Still out of scope:
 - automatic access to chat history
 - sending links to customers
+- images and attachments

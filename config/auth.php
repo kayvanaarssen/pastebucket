@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\OAuthUser;
 use App\Models\User;
 
 return [
@@ -42,6 +43,13 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // OAuth access tokens issued to remote MCP clients such as ChatGPT.
+        // Separate from Sanctum's personal access tokens, which only /api uses.
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'oauth_users',
+        ],
     ],
 
     /*
@@ -65,6 +73,12 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        // The same users table, seen through a model that speaks Passport.
+        'oauth_users' => [
+            'driver' => 'eloquent',
+            'model' => OAuthUser::class,
         ],
 
         // 'users' => [
