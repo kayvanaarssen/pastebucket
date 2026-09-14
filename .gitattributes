@@ -9,3 +9,6 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# Byte-exact publishing fixtures: keep CRLF, BOM and trailing whitespace as-is
+mcp/test/fixtures/** -text

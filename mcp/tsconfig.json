@@ -1,0 +1,24 @@
+{
+    "compilerOptions": {
+        "target": "ES2023",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "lib": ["ES2023", "DOM"],
+        "types": ["node"],
+        "strict": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "declaration": false,
+        "sourceMap": false,
+        // The crypto core lives in the Laravel app's resources/ tree and is
+        // shared with the website, so the build root is the repository root.
+        // Sources import it with a real `.ts` extension, which this rewrites
+        // to `.js` on emit -- the same file then runs under vitest unbuilt.
+        "rootDir": "..",
+        "outDir": "dist",
+        "rewriteRelativeImportExtensions": true,
+        "allowImportingTsExtensions": true
+    },
+    "include": ["src/**/*.ts", "../resources/js/lib/crypto-core.ts"]
+}
