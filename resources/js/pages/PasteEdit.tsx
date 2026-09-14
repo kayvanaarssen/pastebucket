@@ -27,9 +27,13 @@ import {
     writeKeyToFragment,
 } from '@/lib/crypto';
 import type { EncryptionMeta, PageProps, Paste } from '@/types';
+import { RichTextEditor } from '@/components/editor/RichTextEditor';
+import { ConvertedBanner, EditorModeSwitch, useEditorMode } from '@/components/editor/useEditorMode';
+import { ConversionIssueList } from '@/components/editor/ConversionIssues';
+import type { ConversionIssue } from '@/lib/markdown-doc';
 
 interface PasteEditProps extends PageProps {
-    paste: Pick<Paste, 'slug' | 'title' | 'content' | 'language' | 'visibility' | 'burn_after_read' | 'expires_at' | 'is_password_protected' | 'encryption_version' | 'encryption_meta' | 'is_encrypted'>;
+    paste: Pick<Paste, 'slug' | 'title' | 'content' | 'content_format' | 'language' | 'visibility' | 'burn_after_read' | 'expires_at' | 'is_password_protected' | 'encryption_version' | 'encryption_meta' | 'is_encrypted'>;
     maxExpiry: number;
     currentExpiryHours: number;
 }
@@ -136,6 +140,39 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
     const [encrypting, setEncrypting] = useState(false);
     const [cryptoError, setCryptoError] = useState<string | null>(null);
 
+    const editorMode = useEditorMode({
+        getCode: () => ({
+            content: data.content,
+            language: data.language,
+            effectiveLanguage: data.language || autoDetected || '',
+        }),
+        setCode: (content, language) => {
+            setData(previous => ({ ...previous, content, language }));
+            setAutoDetected(null);
+            setShowPreview(false);
+        },
+    });
+    const isRich = editorMode.mode === 'rich';
+
+    // Why a document opened as Markdown source instead of in the visual editor.
+    const [documentIssues, setDocumentIssues] = useState<ConversionIssue[] | null>(null);
+
+    /**
+     * A formatted document opens in the visual editor, but only when that is
+     * lossless. Otherwise it stays in the code editor as Markdown source --
+     * saving from there keeps it exactly as written -- and says why.
+     */
+    const openDocument = (plaintext: string) => {
+        if (paste.content_format !== 'markdown') return;
+        const issues = editorMode.loadMarkdownDocument(plaintext);
+        setDocumentIssues(issues.length ? issues : null);
+    };
+
+    // Unencrypted (legacy) content is readable immediately.
+    useEffect(() => {
+        if (!paste.is_encrypted && gate.status === 'ready') openDocument(paste.content);
+    }, []);
+
     // Fragment mode needs nothing from the user, so it unlocks on mount. The
     // gate only ever leaves 'unlocking' from here, which is why this runs once.
     useEffect(() => {
@@ -153,6 +190,7 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
                 cekRef.current = cek;
                 fragmentKeyRef.current = rawKey;
                 setData('content', plaintext);
+                openDocument(plaintext);
                 setGate({ status: 'ready' });
             } catch (error) {
                 if (cancelled) return;
@@ -178,6 +216,7 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
             const plaintext = await decryptWithCek(paste.content, meta, cek);
             cekRef.current = cek;
             setData('content', plaintext);
+            openDocument(plaintext);
             // The CEK is what the rest of the page needs; the password itself has
             // no further use, so stop holding it.
             setUnlockPassword('');
@@ -227,12 +266,12 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
      * asks for a different password: every link already shared carries the old
      * one, and minting a new key would silently break all of them.
      */
-    const buildEnvelope = async (): Promise<SaveEnvelope> => {
+    const buildEnvelope = async (plaintext: string): Promise<SaveEnvelope> => {
         const cek = cekRef.current;
         const meta = paste.encryption_meta;
 
         if (cek && meta && !data.password && !data.remove_password) {
-            const { content, iv } = await reEncryptWithCek(data.content, cek);
+            const { content, iv } = await reEncryptWithCek(plaintext, cek);
             // Only the IV moves. mode, salt, wrapped_key and wrap_iv still
             // describe the same CEK, so existing links and the existing password
             // keep working.
@@ -246,7 +285,7 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
 
         // Re-keying: a legacy paste has no key yet, and a password change has to
         // discard the wrapped copy of the CEK that the old password unlocked.
-        const encrypted = await encryptContent(data.content, data.password || null);
+        const encrypted = await encryptContent(plaintext, data.password || null);
         return {
             content: encrypted.content,
             encryption_version: encrypted.encryption_version,
@@ -259,9 +298,22 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
         e.preventDefault();
         if (gate.status !== 'ready' || encrypting || needsPasswordChoice) return;
 
-        if (!data.language && autoDetected) {
+        let plaintext = data.content;
+
+        if (isRich) {
+            // Asks first if the document holds something Markdown cannot store.
+            const markdown = await editorMode.markdownForSave();
+            if (markdown === null) return;
+            plaintext = markdown;
+        } else if (!data.language && autoDetected) {
             setData('language', autoDetected);
         }
+
+        // Editing a document's Markdown source keeps it a document. Anything
+        // else written in the code editor is code.
+        const contentFormat = isRich || (paste.content_format === 'markdown' && (data.language || autoDetected) === 'markdown')
+            ? 'markdown'
+            : 'code';
 
         // Inertia's transform is synchronous, so the ciphertext has to exist
         // before the request is built. Encrypt first, then let transform close
@@ -269,7 +321,7 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
         setCryptoError(null);
         setEncrypting(true);
 
-        const envelope = await buildEnvelope().catch(() => null);
+        const envelope = await buildEnvelope(plaintext).catch(() => null);
         setEncrypting(false);
         if (!envelope) {
             setCryptoError('Encryption failed, so nothing was sent. The paste is unchanged.');
@@ -282,8 +334,9 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
 
         transform((formData) => ({
             ...formData,
-            language: formData.language || autoDetected || '',
+            language: isRich ? 'markdown' : formData.language || autoDetected || '',
             content: envelope.content,
+            content_format: contentFormat,
             // The password was consumed locally to wrap the content key. Sending
             // it would hand the server the one thing it needs to unwrap it, and
             // an encrypted paste stores no password server-side at all.
@@ -446,6 +499,30 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
                     </div>
                 )}
 
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <EditorModeSwitch mode={editorMode.mode} onChange={editorMode.requestMode} disabled={encrypting || processing} />
+                    {isRich && (
+                        <p className="text-xs text-muted-foreground">Saved as Markdown and encrypted in your browser.</p>
+                    )}
+                </div>
+
+                {editorMode.original && (
+                    <ConvertedBanner from={editorMode.original.mode} onRestore={editorMode.restore} />
+                )}
+
+                {!isRich && documentIssues && (
+                    <div className="space-y-2 rounded-lg border p-3 text-sm">
+                        <p>
+                            This document is shown as Markdown source, because the visual editor cannot hold everything
+                            in it. Saving from here keeps it exactly as written.
+                        </p>
+                        <ConversionIssueList issues={documentIssues} />
+                        <Button type="button" variant="outline" size="sm" onClick={() => editorMode.requestMode('rich')}>
+                            Open in the visual editor anyway
+                        </Button>
+                    </div>
+                )}
+
                 {/* Title + language badge */}
                 <div className="flex items-center gap-3">
                     <div className="flex-1">
@@ -456,7 +533,7 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
                             className="h-10"
                         />
                     </div>
-                    {effectiveLanguage && (
+                    {!isRich && effectiveLanguage && (
                         <div className="flex items-center gap-1.5 rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground">
                             <Code2 className="h-3.5 w-3.5" />
                             {languages.find(l => l.value === effectiveLanguage)?.label || effectiveLanguage}
@@ -471,7 +548,7 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
                         size="sm"
                         onClick={() => setShowPreview(!showPreview)}
                         disabled={!data.content.trim()}
-                        className="text-xs"
+                        className={isRich ? 'hidden' : 'text-xs'}
                     >
                         {showPreview ? <EyeOff className="mr-1.5 h-3.5 w-3.5" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
                         {showPreview ? 'Edit' : 'Preview'}
@@ -480,7 +557,14 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
 
                 {/* Textarea / Preview */}
                 <div>
-                    {showPreview && data.content.trim() ? (
+                    {isRich ? (
+                        <RichTextEditor
+                            key={editorMode.editorKey}
+                            {...editorMode.richProps}
+                            placeholder="Write or paste formatted text…"
+                            disabled={encrypting || processing}
+                        />
+                    ) : showPreview && data.content.trim() ? (
                         <div className="overflow-x-auto rounded-lg border min-h-[200px] sm:min-h-[300px]">
                             {effectiveLanguage === 'markdown' ? (
                                 <MarkdownPreview content={data.content} />
@@ -513,7 +597,7 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
                 {/* Options bar */}
                 <Card>
                     <CardContent className="flex flex-wrap items-end gap-x-3 gap-y-2 p-3">
-                        <div className="flex flex-col gap-1">
+                        <div className={isRich ? 'hidden' : 'flex flex-col gap-1'}>
                             <Label className="text-xs flex items-center gap-1">
                                 <Code2 className="h-3 w-3" />
                                 Language
@@ -657,13 +741,14 @@ export default function PasteEdit({ paste, maxExpiry, currentExpiryHours }: Past
                         <Button
                             type="submit"
                             className="ml-auto self-center"
-                            disabled={processing || encrypting || needsPasswordChoice || !data.content.trim()}
+                            disabled={processing || encrypting || needsPasswordChoice || (isRich ? editorMode.richEmpty : !data.content.trim())}
                         >
                             {encrypting ? 'Encrypting...' : processing ? 'Saving...' : 'Save Changes'}
                         </Button>
                     </CardContent>
                 </Card>
             </form>
+            {editorMode.dialogs}
         </AppLayout>
     );
 }

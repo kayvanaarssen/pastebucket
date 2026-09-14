@@ -91,7 +91,10 @@ export default function PasteView({ paste }: PasteViewProps) {
     const [copied, setCopied] = useState(false);
     const [urlCopied, setUrlCopied] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const [showFormatted, setShowFormatted] = useState(paste.language === 'markdown');
+    // A formatted document (visual editor or API/MCP publication) is read as a
+    // document first; its Markdown source is one toggle away.
+    const isDocument = paste.content_format === 'markdown';
+    const [showFormatted, setShowFormatted] = useState(paste.language === 'markdown' || isDocument);
     const [decryption, setDecryption] = useState<DecryptionState>(() => initialDecryptionState(paste));
     const [fragmentKey, setFragmentKey] = useState<string | null>(
         () => readKeyFromFragment() ?? claimKeyForNewPaste(),
@@ -323,6 +326,19 @@ export default function PasteView({ paste }: PasteViewProps) {
         });
     };
 
+    /** The exact moment, in the reader's own time zone, with the zone spelled out. */
+    const formatExactMoment = (dateStr: string) => {
+        return new Date(dateStr).toLocaleString('en-US', {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short',
+        });
+    };
+
     const timeUntilExpiry = (dateStr: string) => {
         const diff = new Date(dateStr).getTime() - Date.now();
         if (diff <= 0) return 'Expired';
@@ -359,7 +375,12 @@ export default function PasteView({ paste }: PasteViewProps) {
                                 {visibilityIcon[paste.visibility]}
                                 {paste.visibility}
                             </Badge>
-                            {paste.language && (
+                            {isDocument ? (
+                                <Badge variant="secondary" className="gap-1">
+                                    <FileText className="h-3 w-3" />
+                                    Document
+                                </Badge>
+                            ) : paste.language && (
                                 <Badge variant="secondary" className="gap-1">
                                     <Code2 className="h-3 w-3" />
                                     {paste.language}
@@ -391,7 +412,7 @@ export default function PasteView({ paste }: PasteViewProps) {
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -444,7 +465,7 @@ export default function PasteView({ paste }: PasteViewProps) {
                                         {copied ? 'Copied!' : 'Copy'}
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Copy paste content</TooltipContent>
+                                <TooltipContent>{isDocument ? 'Copy the document as Markdown' : 'Copy paste content'}</TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
                         <Button variant="outline" size="sm" asChild>
@@ -453,14 +474,14 @@ export default function PasteView({ paste }: PasteViewProps) {
                                 Raw
                             </a>
                         </Button>
-                        {paste.language === 'markdown' && (
+                        {(paste.language === 'markdown' || isDocument) && (
                             <Button
                                 variant={showFormatted ? 'default' : 'outline'}
                                 size="sm"
                                 onClick={() => setShowFormatted(!showFormatted)}
                             >
                                 {showFormatted ? <Code2 className="mr-1.5 h-4 w-4" /> : <BookOpen className="mr-1.5 h-4 w-4" />}
-                                {showFormatted ? 'Source' : 'Formatted'}
+                                {showFormatted ? 'Source' : isDocument ? 'Document' : 'Formatted'}
                             </Button>
                         )}
                         {paste.is_owner && (
@@ -486,19 +507,38 @@ export default function PasteView({ paste }: PasteViewProps) {
                 </div>
 
                 {/* Stats bar */}
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                         <Eye className="h-3.5 w-3.5" />
                         {paste.views} view{paste.views !== 1 ? 's' : ''}
                     </span>
                     {lineCount !== null && <span>{lineCount} line{lineCount !== 1 ? 's' : ''}</span>}
-                    {paste.expires_at && (
-                        <span className="flex items-center gap-1">
+                    {paste.expires_at && !isDocument && (
+                        <span className="flex items-center gap-1" title={`Expires ${formatExactMoment(paste.expires_at)}`}>
                             <Clock className="h-3.5 w-3.5" />
                             Expires in {timeUntilExpiry(paste.expires_at)}
                         </span>
                     )}
                 </div>
+
+                {/* A reader of a shared document needs one thing above all: until when it is available. */}
+                {isDocument && (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                        <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        {paste.expires_at ? (
+                            <>
+                                <span>
+                                    Available until <strong className="font-semibold">{formatExactMoment(paste.expires_at)}</strong>
+                                </span>
+                                <span className="text-muted-foreground">
+                                    ({timeUntilExpiry(paste.expires_at) === 'Expired' ? 'expired' : `in ${timeUntilExpiry(paste.expires_at)}`})
+                                </span>
+                            </>
+                        ) : (
+                            <span>No expiry date</span>
+                        )}
+                    </div>
+                )}
 
                 {/*
                   * The short link, shown because it cannot be looked up again.
@@ -523,8 +563,10 @@ export default function PasteView({ paste }: PasteViewProps) {
 
                 {/* Code block / Markdown preview -- never the ciphertext */}
                 {decryption.status === 'ready' && (
-                    <div className="overflow-x-auto rounded-lg border">
-                        {paste.language === 'markdown' && showFormatted ? (
+                    <div className={isDocument && showFormatted ? 'rounded-lg border bg-card' : 'overflow-x-auto rounded-lg border'}>
+                        {isDocument && showFormatted ? (
+                            <MarkdownPreview content={decryption.content} variant="document" />
+                        ) : paste.language === 'markdown' && showFormatted ? (
                             <MarkdownPreview content={decryption.content} />
                         ) : (
                             <CodeHighlighter code={decryption.content} language={paste.language ?? undefined} />

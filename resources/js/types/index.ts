@@ -40,6 +40,12 @@ export interface Paste {
     encryption_version: number | null;
     encryption_meta: EncryptionMeta | null;
     is_encrypted: boolean;
+    /**
+     * How the content is meant to be read. `markdown` is a formatted document
+     * (visual editor, API/MCP publications) shown as a reading view; `code`
+     * is everything else, including legacy pastes, shown with highlighting.
+     */
+    content_format: 'code' | 'markdown';
     language: string | null;
     visibility: 'public' | 'unlisted' | 'private';
     burn_after_read: boolean;

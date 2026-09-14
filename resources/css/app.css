@@ -81,3 +81,82 @@
         font-feature-settings: "rlig" 1, "calt" 1;
     }
 }
+
+/*
+ * Visual editor content. Code blocks and inline code match MarkdownPreview so
+ * the author sees what the reader will see, in both themes.
+ */
+@layer components {
+    .tiptap-content p.is-editor-empty:first-child::before {
+        content: attr(data-placeholder);
+        @apply pointer-events-none float-left h-0 text-muted-foreground;
+    }
+
+    .tiptap-content pre {
+        @apply overflow-x-auto rounded-lg bg-zinc-900 p-4 font-mono text-[0.95rem] leading-relaxed text-zinc-100 dark:bg-zinc-800;
+        white-space: pre;
+        tab-size: 4;
+    }
+
+    .tiptap-content pre code {
+        @apply bg-transparent p-0 font-normal text-inherit;
+        font-size: inherit;
+    }
+
+    .tiptap-content :not(pre) > code {
+        @apply rounded bg-zinc-200 px-1.5 py-0.5 font-mono text-[0.9em] font-normal text-foreground dark:bg-zinc-700;
+    }
+
+    .tiptap-content :not(pre) > code::before,
+    .tiptap-content :not(pre) > code::after {
+        content: none;
+    }
+
+    .tiptap-content ul[data-type="taskList"] {
+        @apply list-none pl-1;
+    }
+
+    .tiptap-content ul[data-type="taskList"] li {
+        @apply flex items-start gap-2 pl-0;
+    }
+
+    .tiptap-content ul[data-type="taskList"] li > label {
+        @apply mt-[0.3em] shrink-0 select-none;
+    }
+
+    .tiptap-content ul[data-type="taskList"] li > label input {
+        @apply h-4 w-4 accent-primary;
+    }
+
+    .tiptap-content ul[data-type="taskList"] li > div {
+        @apply min-w-0 flex-1;
+    }
+
+    .tiptap-content ul[data-type="taskList"] li > div > p {
+        @apply my-0;
+    }
+
+    .tiptap-content table {
+        @apply my-4 w-full border-collapse;
+    }
+
+    .tiptap-content th,
+    .tiptap-content td {
+        @apply relative border border-border px-2 py-1 align-top;
+        min-width: 4rem;
+    }
+
+    .tiptap-content th {
+        @apply bg-muted font-semibold;
+    }
+
+    .tiptap-content th > p,
+    .tiptap-content td > p {
+        @apply my-0;
+    }
+
+    .tiptap-content .selectedCell::after {
+        content: "";
+        @apply pointer-events-none absolute inset-0 bg-primary/15;
+    }
+}
