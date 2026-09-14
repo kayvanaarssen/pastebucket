@@ -6,6 +6,16 @@ All notable changes to PasteBucket will be documented in this file.
 
 ### Added
 
+- **Formatted text editor** — an optional visual editor next to the (still default) code editor, with headings, bold/italic/strikethrough, lists, checklists, links, quotes, tables, inline code, code blocks and undo/redo; cleaned-up pasting from ChatGPT, Claude and Word; explicit Markdown import; warnings with cancel before any lossy conversion
+- **Document view** — `markdown` pastes render as a readable, mobile-friendly document with a Source toggle, a clearly shown expiry moment, copy buttons and no remote image loading
+- Explicit `content_format` (`code` | `markdown`) per paste; existing pastes are `code` and untouched
+- **Integration API** `/api/v1` — `POST /pastes`, `GET /pastes/{slug}`, `DELETE /pastes/{slug}`, `GET /limits`, with Sanctum personal access tokens (hashed, shown once, abilities, expiry), idempotency keys, rate limits and a configurable payload limit
+- API token management on the profile page
+- **MCP server and CLI** (`mcp/`) for Claude Code and Codex — local encryption with the shared crypto core, fragment links, optional password, byte-exact file publishing, retry-safe recovery records
+- Revocation: withdrawn pastes have their ciphertext wiped immediately and show a clear notice
+- Clear pages for expired, withdrawn and invalid links
+- `docs/integrations.md` (formats, API, limits, encryption, metadata, expiry, backups) and `docs/upgrade.md`
+
 - **End-to-end encryption** — paste content is encrypted in the browser with AES-GCM-256 before it is sent. The server stores ciphertext and never receives the key
 - Link-key mode: the content key travels in the URL fragment (`/p/{slug}#k=...`), which browsers never transmit to the server
 - Password mode: the content key is wrapped with a PBKDF2-HMAC-SHA256 key (600,000 iterations) derived in the browser. The password itself is never sent
@@ -15,6 +25,10 @@ All notable changes to PasteBucket will be documented in this file.
 
 ### Changed
 
+- Expiry is inclusive and checked identically on every content route: a paste is unavailable *at* its expiry moment, not after it
+- Paste routes send `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex` (public pastes stay indexable)
+- The browser encryption module is split into an environment-independent `crypto-core.ts` (shared with the MCP client) and browser helpers in `crypto.ts`; decryption now keeps a leading byte-order mark
+- `pastes:clean` also removes long-revoked rows and stale idempotency records; `sanctum:prune-expired` runs daily
 - Paste passwords are no longer hashed and stored server-side for encrypted pastes — the password only unwraps the content key in the browser, so storing a verifier would weaken the key
 - The server-side password gate and `/p/{slug}/verify` route now apply to legacy plaintext pastes only; encrypted pastes unlock entirely in the browser
 - Editing a legacy plaintext paste encrypts it

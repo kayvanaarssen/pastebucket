@@ -15,6 +15,9 @@ A self-hosted pastebin alternative built with Laravel and React. Share code snip
 ## Features
 
 - **Syntax Highlighting** - Auto-detection for 40+ languages with manual override. Powered by Prism via react-syntax-highlighter.
+- **Formatted Text Editor** - Optionally switch from the code editor (still the default) to a visual editor for headings, lists, checklists, links, quotes, tables and code blocks, with Markdown import and cleaned-up pasting from ChatGPT, Claude and Word. Documents are stored as GitHub-flavoured Markdown and shown to recipients as a readable page. See [docs/integrations.md](docs/integrations.md#1-content-formats).
+- **Integration API** - A versioned JSON API (`/api/v1`) with personal, revocable, ability-scoped access tokens managed on the profile page. Publish end-to-end encrypted documents, check their status, and revoke them. See [docs/integrations.md](docs/integrations.md#2-the-api-apiv1).
+- **MCP Server & CLI** - Let Claude Code or Codex publish an answer or a transcript file as an expiring customer link, encrypted locally before it is sent. See [mcp/README.md](mcp/README.md).
 - **Light & Dark Mode** - Automatic theme switching based on system preference, with manual toggle. Syntax highlighting adapts instantly.
 - **End-to-End Encryption** - Paste content is encrypted in your browser with AES-GCM-256 before it is sent. The server stores ciphertext and never receives the key. See [Encryption](#encryption) for what this does and does not protect against.
 - **Password Protection** - Optionally protect any paste with a password. The password never leaves your browser; it derives a key that unwraps the paste's content key.
