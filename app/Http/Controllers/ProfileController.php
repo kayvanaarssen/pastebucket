@@ -16,6 +16,16 @@ class ProfileController extends Controller
                 ->select('id', 'name', 'last_used_at', 'created_at')
                 ->orderBy('created_at', 'desc')
                 ->get(),
+            'api_tokens' => ApiTokenController::tokensFor($request),
+            'api_token_options' => [
+                'abilities' => collect(ApiTokenController::ABILITIES)
+                    ->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])
+                    ->values(),
+                'expiry_days' => array_values(array_filter(
+                    ApiTokenController::EXPIRY_DAYS,
+                    fn (int $days) => $days <= (int) config('pastebucket.api.token_max_lifetime_days'),
+                )),
+            ],
         ]);
     }
 

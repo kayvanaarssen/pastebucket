@@ -9,6 +9,27 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Paste extends Model
 {
     /**
+     * How the decrypted content is meant to be read.
+     *
+     * code     - the original editor: shown verbatim with syntax highlighting
+     *            chosen by `language` (a `markdown` language keeps its old
+     *            Source/Formatted toggle). Every paste before this column.
+     * markdown - a document: GitHub-flavoured Markdown rendered as a readable
+     *            page, edited with the visual editor. Rich text is stored as
+     *            Markdown, so publishing Markdown keeps it byte for byte.
+     *
+     * The format is stored on its own rather than inferred from `language`,
+     * which only ever described highlighting.
+     */
+    public const CONTENT_FORMATS = ['code', 'markdown'];
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_EXPIRED = 'expired';
+
+    public const STATUS_REVOKED = 'revoked';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -20,15 +41,18 @@ class Paste extends Model
         'user_id',
         'title',
         'content',
+        'content_format',
         'encryption_version',
         'encryption_meta',
         'language',
         'password',
         'visibility',
         'expires_at',
+        'revoked_at',
         'burn_after_read',
         'views',
         'ip_address',
+        'created_via',
     ];
 
     /**
@@ -50,6 +74,7 @@ class Paste extends Model
     {
         return [
             'expires_at' => 'datetime',
+            'revoked_at' => 'datetime',
             'burn_after_read' => 'boolean',
             'encryption_meta' => 'array',
             'short_meta' => 'array',
@@ -73,11 +98,13 @@ class Paste extends Model
     }
 
     /**
-     * Scope a query to only include non-expired pastes.
+     * Scope a query to pastes that can still be served: not expired, not revoked.
+     *
+     * The boundary matches isExpired(): a paste is gone *at* its expiry moment.
      */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where(function (Builder $query) {
+        return $query->whereNull('revoked_at')->where(function (Builder $query) {
             $query->whereNull('expires_at')
                   ->orWhere('expires_at', '>', now());
         });
@@ -85,10 +112,32 @@ class Paste extends Model
 
     /**
      * Determine if the paste has expired.
+     *
+     * Inclusive on purpose. "Valid for seven days" ends at the stated moment,
+     * not one clock tick after it, and every route asks this same question so
+     * none of them can serve a paste the others already refuse.
      */
     public function isExpired(): bool
     {
-        return $this->expires_at !== null && $this->expires_at->isPast();
+        return $this->expires_at !== null && $this->expires_at->lessThanOrEqualTo(now());
+    }
+
+    /**
+     * Determine if the owner withdrew the paste. A revoked paste keeps only its
+     * metadata row -- the ciphertext is wiped at revocation.
+     */
+    public function isRevoked(): bool
+    {
+        return $this->revoked_at !== null;
+    }
+
+    public function status(): string
+    {
+        return match (true) {
+            $this->isRevoked() => self::STATUS_REVOKED,
+            $this->isExpired() => self::STATUS_EXPIRED,
+            default => self::STATUS_ACTIVE,
+        };
     }
 
     /**
@@ -128,5 +177,11 @@ class Paste extends Model
     public function isEncrypted(): bool
     {
         return $this->encryption_version !== null;
+    }
+
+    /** Rows from before the column existed read as the original code format. */
+    public function contentFormat(): string
+    {
+        return $this->content_format ?? 'code';
     }
 }

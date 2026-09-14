@@ -5,7 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Fingerprint, KeyRound, Plus, Trash2, User, Lock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertTriangle, Check, Copy, Fingerprint, KeyRound, Plus, Terminal, Trash2, User, Lock } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { apiFetch } from '@/lib/api';
@@ -18,11 +21,284 @@ interface PasskeyInfo {
     created_at: string;
 }
 
-interface ProfileProps extends PageProps {
-    passkeys: PasskeyInfo[];
+interface ApiTokenInfo {
+    id: number;
+    name: string;
+    abilities: string[];
+    last_used_at: string | null;
+    expires_at: string | null;
+    created_at: string;
+    is_expired: boolean;
 }
 
-export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
+interface ApiTokenOptions {
+    abilities: { value: string; label: string }[];
+    expiry_days: number[];
+}
+
+interface ProfileProps extends PageProps {
+    passkeys: PasskeyInfo[];
+    api_tokens: ApiTokenInfo[];
+    api_token_options: ApiTokenOptions;
+}
+
+/** Laravel validation answers carry per-field arrays; show the first one. */
+function firstError(data: unknown): string | null {
+    const body = data as { errors?: Record<string, string[]>; message?: string } | null;
+    const fieldErrors = body?.errors ? Object.values(body.errors)[0] : null;
+    return fieldErrors?.[0] ?? body?.message ?? null;
+}
+
+/**
+ * Personal API tokens for the MCP server and CLI.
+ *
+ * The token is shown exactly once, straight from the create response. The
+ * server keeps only a SHA-256 hash, so closing the dialog without copying it
+ * means creating a new one -- which the dialog says before it can be closed.
+ */
+function ApiTokensCard({ tokens, options }: { tokens: ApiTokenInfo[]; options: ApiTokenOptions }) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [name, setName] = useState('');
+    const [abilities, setAbilities] = useState<string[]>(() => options.abilities.map(a => a.value));
+    const [expiryDays, setExpiryDays] = useState<number>(() =>
+        options.expiry_days.includes(90) ? 90 : options.expiry_days[0],
+    );
+    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [newToken, setNewToken] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+    const [revokeId, setRevokeId] = useState<number | null>(null);
+
+    const reloadTokens = () => router.reload({ only: ['api_tokens'] });
+
+    const createToken = async () => {
+        if (!name.trim() || abilities.length === 0 || creating) return;
+        setCreating(true);
+        setError(null);
+
+        try {
+            const res = await apiFetch('/profile/tokens', {
+                method: 'POST',
+                body: JSON.stringify({ name: name.trim(), abilities, expires_in_days: expiryDays }),
+            });
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok) {
+                setError(firstError(data) ?? 'Could not create the token.');
+                return;
+            }
+
+            setCreateOpen(false);
+            setName('');
+            setNewToken(data.token as string);
+            reloadTokens();
+        } catch {
+            setError('Could not create the token.');
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const revokeToken = async (id: number) => {
+        setError(null);
+        try {
+            const res = await apiFetch(`/profile/tokens/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                setError(firstError(await res.json().catch(() => null)) ?? 'Could not revoke the token.');
+                return;
+            }
+            setRevokeId(null);
+        } catch {
+            setError('Could not revoke the token.');
+        } finally {
+            reloadTokens();
+        }
+    };
+
+    const copyToken = async () => {
+        if (!newToken) return;
+        await navigator.clipboard.writeText(newToken);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const formatDate = (dateStr: string) =>
+        new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const toggleAbility = (value: string, checked: boolean) =>
+        setAbilities(current => (checked ? [...new Set([...current, value])] : current.filter(a => a !== value)));
+
+    return (
+        <>
+            <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <Terminal className="h-5 w-5" />
+                            API Tokens
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Let the Pastebucket MCP server or CLI publish encrypted pastes on your behalf.
+                            A token never grants access to other users' pastes.
+                        </p>
+                    </div>
+                    <Button size="sm" className="shrink-0" onClick={() => { setError(null); setCreateOpen(true); }}>
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        New Token
+                    </Button>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                    {error && !createOpen && <p className="text-sm text-destructive">{error}</p>}
+                    {tokens.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No API tokens yet.</p>
+                    ) : (
+                        tokens.map(token => (
+                            <div key={token.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                                <div className="min-w-0 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        <span className="truncate text-sm font-medium">{token.name}</span>
+                                        {token.is_expired && <Badge variant="destructive">Expired</Badge>}
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {token.abilities.map(ability => (
+                                            <Badge key={ability} variant="secondary" className="font-mono text-[11px]">{ability}</Badge>
+                                        ))}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Created {formatDate(token.created_at)}
+                                        {token.expires_at && ` · ${token.is_expired ? 'Expired' : 'Expires'} ${formatDate(token.expires_at)}`}
+                                        {` · ${token.last_used_at ? `Last used ${formatDate(token.last_used_at)}` : 'Never used'}`}
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                                    onClick={() => setRevokeId(token.id)}
+                                    title="Revoke token"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create API Token</DialogTitle>
+                        <DialogDescription>
+                            Give only the abilities the integration needs. The token is shown once.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="token-name">Name</Label>
+                            <Input
+                                id="token-name"
+                                placeholder="e.g. Claude Code on my laptop"
+                                value={name}
+                                maxLength={100}
+                                onChange={e => setName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Abilities</Label>
+                            {options.abilities.map(ability => (
+                                <label key={ability.value} className="flex items-start gap-2 text-sm">
+                                    <Checkbox
+                                        className="mt-0.5"
+                                        checked={abilities.includes(ability.value)}
+                                        onCheckedChange={checked => toggleAbility(ability.value, checked === true)}
+                                    />
+                                    <span>
+                                        <span className="font-mono text-xs">{ability.value}</span>
+                                        <span className="block text-muted-foreground">{ability.label}</span>
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Expires after</Label>
+                            <Select value={String(expiryDays)} onValueChange={v => setExpiryDays(Number(v))}>
+                                <SelectTrigger className="w-[160px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {options.expiry_days.map(days => (
+                                        <SelectItem key={days} value={String(days)}>{days} days</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {error && <p className="text-sm text-destructive">{error}</p>}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                        <Button onClick={createToken} disabled={creating || !name.trim() || abilities.length === 0}>
+                            {creating ? 'Creating...' : 'Create Token'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Not dismissable by clicking outside: the token cannot be shown again. */}
+            <Dialog open={newToken !== null} onOpenChange={open => { if (!open) { setNewToken(null); setCopied(false); } }}>
+                <DialogContent onInteractOutside={e => e.preventDefault()}>
+                    <DialogHeader>
+                        <DialogTitle>Copy your new token</DialogTitle>
+                        <DialogDescription>
+                            Store it as PASTEBUCKET_API_TOKEN for the MCP server or CLI.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Input
+                                readOnly
+                                value={newToken ?? ''}
+                                onFocus={e => e.currentTarget.select()}
+                                className="font-mono text-xs"
+                            />
+                            <Button size="icon" variant="outline" className="shrink-0" onClick={copyToken} title="Copy token">
+                                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                        <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                            This is the only time the token is shown. Only a hash is stored, so it cannot be recovered later.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={() => { setNewToken(null); setCopied(false); }}>I have stored it</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={revokeId !== null} onOpenChange={open => { if (!open) setRevokeId(null); }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Revoke API Token</DialogTitle>
+                        <DialogDescription>
+                            Integrations using this token stop working immediately. Pastes already published stay online until they expire.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRevokeId(null)}>Cancel</Button>
+                        <Button variant="destructive" onClick={() => revokeId !== null && revokeToken(revokeId)}>
+                            <Trash2 className="mr-1.5 h-4 w-4" />
+                            Revoke
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
+export default function Profile({ passkeys: initialPasskeys, api_tokens, api_token_options }: ProfileProps) {
     const { auth } = usePage<PageProps>().props;
 
     const profileForm = useForm({
@@ -254,6 +530,8 @@ export default function Profile({ passkeys: initialPasskeys }: ProfileProps) {
                         </CardContent>
                     </Card>
                 )}
+
+                <ApiTokensCard tokens={api_tokens} options={api_token_options} />
             </div>
 
             <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>

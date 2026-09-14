@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PasteUnavailableException;
+use App\Http\Middleware\SharedContentHeaders;
 use App\Models\Paste;
+use App\Services\PasteService;
+use App\Support\EncryptionEnvelope;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
@@ -22,32 +25,33 @@ class PasteController extends Controller
 
     private const SHORT_CODE_LENGTH = 6;
 
+    public function __construct(private readonly PasteService $pastes)
+    {
+    }
+
     public function index()
     {
         return Inertia::render('Home', [
             'defaultExpiry' => config('pastebucket.default_expiry_hours'),
-            'maxExpiry' => auth()->check()
-                ? config('pastebucket.user_max_expiry_hours')
-                : config('pastebucket.guest_max_expiry_hours'),
+            'maxExpiry' => $this->pastes->maxExpiryHoursFor(auth()->user()),
             'isAuthenticated' => auth()->check(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $maxExpiry = auth()->check()
-            ? config('pastebucket.user_max_expiry_hours')
-            : config('pastebucket.guest_max_expiry_hours');
+        $maxExpiry = $this->pastes->maxExpiryHoursFor(auth()->user());
 
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'content' => 'required|string',
+            'content_format' => 'nullable|in:'.implode(',', Paste::CONTENT_FORMATS),
             'language' => 'nullable|string|max:50',
             'password' => 'nullable|string|min:1',
             'visibility' => 'required|in:public,unlisted,private',
             'expiry_hours' => "nullable|numeric|min:0|max:{$maxExpiry}",
             'burn_after_read' => 'boolean',
-            ...self::encryptionRules(),
+            ...EncryptionEnvelope::browserRules(),
         ]);
 
         // Only logged-in users can create private pastes
@@ -60,18 +64,18 @@ class PasteController extends Controller
             $validated['expiry_hours'] = config('pastebucket.default_expiry_hours', 24);
         }
 
-        $slug = $this->generateUniqueSlug();
-
         $isEncrypted = ($validated['encryption_version'] ?? null) !== null;
 
-        $paste = Paste::create([
-            'slug' => $slug,
+        $paste = $this->pastes->create([
             'user_id' => auth()->id(),
-            'title' => $validated['title'],
+            'title' => $validated['title'] ?? null,
             'content' => $validated['content'],
+            // The website default stays the code editor; only an explicit
+            // choice of the formatted-text editor makes a document.
+            'content_format' => $validated['content_format'] ?? 'code',
             'encryption_version' => $validated['encryption_version'] ?? null,
             'encryption_meta' => $validated['encryption_meta'] ?? null,
-            'language' => $validated['language'],
+            'language' => $validated['language'] ?? null,
             // An encrypted paste's password never leaves the browser -- it only
             // unwraps the content key there. Storing a hash of it would leak an
             // offline-crackable verifier for the key, so we store nothing.
@@ -82,6 +86,7 @@ class PasteController extends Controller
             'expires_at' => $validated['expiry_hours'] ? now()->addHours($validated['expiry_hours']) : null,
             'burn_after_read' => $validated['burn_after_read'] ?? false,
             'ip_address' => $request->ip(),
+            'created_via' => 'web',
         ]);
 
         // Mark this session as the creator so burn-after-read doesn't fire on their first view
@@ -92,7 +97,7 @@ class PasteController extends Controller
 
     public function show(string $slug)
     {
-        return $this->renderPaste(Paste::where('slug', $slug)->firstOrFail());
+        return $this->renderPaste($this->findPaste($slug));
     }
 
     /**
@@ -119,7 +124,8 @@ class PasteController extends Controller
      */
     public function showByShortCode(string $code)
     {
-        $paste = Paste::where('short_code_hash', self::hashShortCode($code))->firstOrFail();
+        $paste = Paste::where('short_code_hash', self::hashShortCode($code))->first()
+            ?? throw new PasteUnavailableException(PasteUnavailableException::NOT_FOUND);
 
         return $this->renderPaste($paste, viaShortCode: true);
     }
@@ -133,12 +139,8 @@ class PasteController extends Controller
      */
     public function createShortLink(Request $request, string $slug)
     {
-        $paste = Paste::where('slug', $slug)->firstOrFail();
-
-        if ($paste->isExpired()) {
-            $paste->delete();
-            abort(404, 'This paste has expired.');
-        }
+        $paste = $this->findPaste($slug);
+        $this->ensureAvailable($paste);
 
         if (!$paste->isOwnedByViewer()) {
             abort(403, 'Only the paste owner can create a short link.');
@@ -185,10 +187,7 @@ class PasteController extends Controller
      */
     private function renderPaste(Paste $paste, bool $viaShortCode = false)
     {
-        if ($paste->isExpired()) {
-            $paste->delete();
-            abort(404, 'This paste has expired.');
-        }
+        $this->ensureAvailable($paste);
 
         // Private pastes only viewable by owner
         if ($paste->visibility === 'private' && auth()->id() !== $paste->user_id) {
@@ -206,6 +205,10 @@ class PasteController extends Controller
                     'title' => $paste->title,
                 ]);
             }
+        }
+
+        if ($paste->visibility === 'public') {
+            request()->attributes->set(SharedContentHeaders::INDEXABLE, true);
         }
 
         // Determine if the viewer is the owner (authenticated owner or anonymous creator via session)
@@ -227,6 +230,7 @@ class PasteController extends Controller
                 'short_meta' => $viaShortCode ? $paste->short_meta : null,
                 'title' => $paste->title,
                 'content' => $paste->content,
+                'content_format' => $paste->contentFormat(),
                 'encryption_version' => $paste->encryption_version,
                 'encryption_meta' => $paste->encryption_meta,
                 'is_encrypted' => $paste->isEncrypted(),
@@ -269,6 +273,16 @@ class PasteController extends Controller
             return response()->noContent();
         }
 
+        // Gone for another reason. Nothing is left to burn, and an expired row
+        // is deleted on sight like everywhere else.
+        if ($paste->isRevoked() || $paste->isExpired()) {
+            if ($paste->isExpired()) {
+                $paste->delete();
+            }
+
+            return response()->noContent();
+        }
+
         // Only ever destroys pastes that opted into burning, so this cannot be
         // turned into a delete primitive for arbitrary pastes.
         if (!$paste->burn_after_read || !$paste->isEncrypted()) {
@@ -288,7 +302,8 @@ class PasteController extends Controller
 
     public function verifyPassword(Request $request, string $slug)
     {
-        $paste = Paste::where('slug', $slug)->firstOrFail();
+        $paste = $this->findPaste($slug);
+        $this->ensureAvailable($paste);
 
         // Encrypted pastes unlock in the browser; there is no server-side secret
         // to verify and no session gate to set.
@@ -309,7 +324,8 @@ class PasteController extends Controller
 
     public function showRaw(string $slug)
     {
-        $paste = Paste::where('slug', $slug)->active()->firstOrFail();
+        $paste = $this->findPaste($slug);
+        $this->ensureAvailable($paste);
 
         if ($paste->visibility === 'private' && auth()->id() !== $paste->user_id) {
             abort(403);
@@ -325,6 +341,7 @@ class PasteController extends Controller
                     'slug' => $paste->slug,
                     'title' => $paste->title,
                     'content' => $paste->content,
+                    'content_format' => $paste->contentFormat(),
                     'encryption_version' => $paste->encryption_version,
                     'encryption_meta' => $paste->encryption_meta,
                     'is_password_protected' => $paste->isPasswordProtected(),
@@ -341,16 +358,13 @@ class PasteController extends Controller
 
     public function edit(string $slug)
     {
-        $paste = Paste::where('slug', $slug)->firstOrFail();
+        $paste = $this->findPaste($slug);
 
         if (auth()->id() !== $paste->user_id) {
             abort(403, 'You can only edit your own pastes.');
         }
 
-        if ($paste->isExpired()) {
-            $paste->delete();
-            abort(404, 'This paste has expired.');
-        }
+        $this->ensureAvailable($paste);
 
         $maxExpiry = config('pastebucket.user_max_expiry_hours');
 
@@ -366,6 +380,7 @@ class PasteController extends Controller
                 'slug' => $paste->slug,
                 'title' => $paste->title,
                 'content' => $paste->content,
+                'content_format' => $paste->contentFormat(),
                 'encryption_version' => $paste->encryption_version,
                 'encryption_meta' => $paste->encryption_meta,
                 'is_encrypted' => $paste->isEncrypted(),
@@ -382,42 +397,45 @@ class PasteController extends Controller
 
     public function update(Request $request, string $slug)
     {
-        $paste = Paste::where('slug', $slug)->firstOrFail();
+        $paste = $this->findPaste($slug);
 
         if (auth()->id() !== $paste->user_id) {
             abort(403, 'You can only edit your own pastes.');
         }
 
-        if ($paste->isExpired()) {
-            $paste->delete();
-            abort(404, 'This paste has expired.');
-        }
+        $this->ensureAvailable($paste);
 
         $maxExpiry = config('pastebucket.user_max_expiry_hours');
 
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'content' => 'required|string',
+            'content_format' => 'nullable|in:'.implode(',', Paste::CONTENT_FORMATS),
             'language' => 'nullable|string|max:50',
             'password' => 'nullable|string|min:1',
             'remove_password' => 'boolean',
             'visibility' => 'required|in:public,unlisted,private',
             'expiry_hours' => "nullable|numeric|min:0|max:{$maxExpiry}",
             'burn_after_read' => 'boolean',
-            ...self::encryptionRules(),
+            ...EncryptionEnvelope::browserRules(),
         ]);
 
         $isEncrypted = ($validated['encryption_version'] ?? null) !== null;
 
         $updateData = [
-            'title' => $validated['title'],
+            'title' => $validated['title'] ?? null,
             'content' => $validated['content'],
             'encryption_version' => $validated['encryption_version'] ?? null,
             'encryption_meta' => $validated['encryption_meta'] ?? null,
-            'language' => $validated['language'],
+            'language' => $validated['language'] ?? null,
             'visibility' => $validated['visibility'],
             'burn_after_read' => $validated['burn_after_read'] ?? false,
         ];
+
+        // Omitted by older pages still open in someone's tab: keep what it was.
+        if (!empty($validated['content_format'])) {
+            $updateData['content_format'] = $validated['content_format'];
+        }
 
         // Handle expiry: recalculate from now
         if (isset($validated['expiry_hours']) && $validated['expiry_hours'] > 0) {
@@ -454,35 +472,29 @@ class PasteController extends Controller
         return redirect()->route('home')->with('success', 'Paste deleted.');
     }
 
-    /**
-     * Validation for the client-supplied encryption envelope.
-     *
-     * These are the non-secret parameters needed to decrypt. The content key is
-     * absent by design: it lives in the URL fragment or is wrapped under the
-     * user's password, and either way the server must never be able to derive it.
-     *
-     * @return array<string, string>
-     */
-    private static function encryptionRules(): array
+    private function findPaste(string $slug): Paste
     {
-        return [
-            'encryption_version' => 'nullable|integer|in:1',
-            'encryption_meta' => 'nullable|array|required_with:encryption_version',
-            'encryption_meta.mode' => 'required_with:encryption_meta|in:fragment,password',
-            'encryption_meta.iv' => 'required_with:encryption_meta|string|max:64',
-            'encryption_meta.salt' => 'nullable|string|max:64',
-            'encryption_meta.iterations' => 'nullable|integer|min:100000|max:10000000',
-            'encryption_meta.wrapped_key' => 'nullable|string|max:256',
-            'encryption_meta.wrap_iv' => 'nullable|string|max:64',
-        ];
+        return Paste::where('slug', $slug)->first()
+            ?? throw new PasteUnavailableException(PasteUnavailableException::NOT_FOUND);
     }
 
-    private function generateUniqueSlug(): string
+    /**
+     * The single gate every content route passes through, so the slug page, the
+     * short link, the raw view and the editor can never disagree about whether
+     * a paste still exists. Expiry is checked against the clock here and now --
+     * the hourly cleanup is housekeeping, never what makes a link stop working.
+     */
+    private function ensureAvailable(Paste $paste): void
     {
-        do {
-            $slug = Str::random(16);
-        } while (Paste::where('slug', $slug)->exists());
+        if ($paste->isRevoked()) {
+            throw new PasteUnavailableException(PasteUnavailableException::REVOKED, $paste->revoked_at);
+        }
 
-        return $slug;
+        if ($paste->isExpired()) {
+            $expiredAt = $paste->expires_at;
+            $paste->delete();
+
+            throw new PasteUnavailableException(PasteUnavailableException::EXPIRED, $expiredAt);
+        }
     }
 }

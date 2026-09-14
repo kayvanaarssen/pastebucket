@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InviteController;
@@ -37,6 +38,13 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
+    // Personal API tokens. Managed from the browser session (CSRF-protected
+    // like every other web route); the tokens themselves only work on /api.
+    Route::post('/profile/tokens', [ApiTokenController::class, 'store'])->name('profile.tokens.store');
+    Route::delete('/profile/tokens/{token}', [ApiTokenController::class, 'destroy'])
+        ->whereNumber('token')
+        ->name('profile.tokens.destroy');
+
     // Passkey management (authenticated)
     Route::get('/passkeys', [PasskeyController::class, 'index']);
     Route::post('/passkey/register/options', [PasskeyController::class, 'registerOptions']);
@@ -60,19 +68,23 @@ Route::middleware('auth')->group(function () {
     });
 });
 
-// Short links. Throttled because a 6-character code is a far smaller search
-// space than a 16-character slug, and this is the only route that exposes it.
-Route::get('/s/{code}', [PasteController::class, 'showByShortCode'])
-    ->where('code', '[a-zA-Z0-9]{4,16}')
-    ->middleware('throttle:30,1')
-    ->name('paste.short');
+// Everything that serves paste content (or ciphertext) is no-store, sends no
+// referrer, and is noindex unless the paste is public.
+Route::middleware('shared-content')->group(function () {
+    // Short links. Throttled because a 6-character code is a far smaller search
+    // space than a 16-character slug, and this is the only route that exposes it.
+    Route::get('/s/{code}', [PasteController::class, 'showByShortCode'])
+        ->where('code', '[a-zA-Z0-9]{4,16}')
+        ->middleware('throttle:30,1')
+        ->name('paste.short');
 
-// Paste routes (must be last due to catch-all slug)
-Route::get('/p/{slug}', [PasteController::class, 'show'])->name('paste.show');
-Route::post('/p/{slug}/short-link', [PasteController::class, 'createShortLink'])->name('paste.short-link');
-Route::post('/p/{slug}/verify', [PasteController::class, 'verifyPassword'])->name('paste.verify');
-Route::post('/p/{slug}/burn', [PasteController::class, 'burn'])->name('paste.burn');
-Route::get('/p/{slug}/raw', [PasteController::class, 'showRaw'])->name('paste.raw');
-Route::get('/p/{slug}/edit', [PasteController::class, 'edit'])->name('paste.edit')->middleware('auth');
-Route::put('/p/{slug}', [PasteController::class, 'update'])->name('paste.update')->middleware('auth');
-Route::delete('/p/{slug}', [PasteController::class, 'destroy'])->name('paste.destroy')->middleware('auth');
+    // Paste routes (must be last due to catch-all slug)
+    Route::get('/p/{slug}', [PasteController::class, 'show'])->name('paste.show');
+    Route::post('/p/{slug}/short-link', [PasteController::class, 'createShortLink'])->name('paste.short-link');
+    Route::post('/p/{slug}/verify', [PasteController::class, 'verifyPassword'])->name('paste.verify');
+    Route::post('/p/{slug}/burn', [PasteController::class, 'burn'])->name('paste.burn');
+    Route::get('/p/{slug}/raw', [PasteController::class, 'showRaw'])->name('paste.raw');
+    Route::get('/p/{slug}/edit', [PasteController::class, 'edit'])->name('paste.edit')->middleware('auth');
+    Route::put('/p/{slug}', [PasteController::class, 'update'])->name('paste.update')->middleware('auth');
+    Route::delete('/p/{slug}', [PasteController::class, 'destroy'])->name('paste.destroy')->middleware('auth');
+});
