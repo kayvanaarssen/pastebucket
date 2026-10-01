@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 class CreateAdminUser extends Command
 {
     protected $signature = 'make:admin {name} {email} {password}';
+
     protected $description = 'Create an admin user';
 
     public function handle(): int

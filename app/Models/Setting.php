@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Cache;
 class Setting extends Model
 {
     protected $primaryKey = 'key';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = ['key', 'value'];
@@ -17,6 +19,7 @@ class Setting extends Model
     {
         return Cache::remember("setting.{$key}", 60, function () use ($key, $default) {
             $setting = static::find($key);
+
             return $setting?->value ?? $default;
         });
     }

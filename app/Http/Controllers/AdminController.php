@@ -8,10 +8,10 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Models\UserInvite;
 use Carbon\Carbon;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
@@ -25,7 +25,7 @@ class AdminController extends Controller
             ->when($search, function ($query, $search) {
                 $query->where('title', 'like', "%{$search}%")
                     ->orWhere('slug', 'like', "%{$search}%")
-                    ->orWhereHas('user', fn($q) => $q->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('user', fn ($q) => $q->where('name', 'like', "%{$search}%"));
             })
             ->orderBy('created_at', 'desc')
             ->paginate(25);
@@ -70,7 +70,7 @@ class AdminController extends Controller
                 'expires_at' => $i->expires_at->toISOString(),
                 'created_at' => $i->created_at->toISOString(),
                 'invited_by' => $i->inviter?->name,
-                'url' => url('/invite/' . $i->token),
+                'url' => url('/invite/'.$i->token),
             ]);
 
         return Inertia::render('Admin/Users', [
@@ -102,14 +102,14 @@ class AdminController extends Controller
             'expires_at' => now()->addHours($validated['expiry_hours']),
         ]);
 
-        $message = 'Invite created: ' . url('/invite/' . $invite->token);
+        $message = 'Invite created: '.url('/invite/'.$invite->token);
 
         if ($request->boolean('send_email')) {
             try {
                 Mail::send(new InviteMail($invite->load('inviter')));
                 $message = "Invite created and emailed to {$invite->email}.";
             } catch (\Throwable $e) {
-                return back()->with('success', $message . ' (Email failed: ' . $e->getMessage() . ')');
+                return back()->with('success', $message.' (Email failed: '.$e->getMessage().')');
             }
         }
 
@@ -129,7 +129,7 @@ class AdminController extends Controller
         try {
             Mail::send(new InviteMail($invite->load('inviter')));
         } catch (\Throwable $e) {
-            return back()->with('error', 'Failed to send email: ' . $e->getMessage());
+            return back()->with('error', 'Failed to send email: '.$e->getMessage());
         }
 
         return back()->with('success', "Invite re-sent to {$invite->email}.");
@@ -138,6 +138,7 @@ class AdminController extends Controller
     public function destroyInvite(UserInvite $invite)
     {
         $invite->delete();
+
         return back()->with('success', 'Invite revoked.');
     }
 
@@ -164,7 +165,7 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
             'password' => ['nullable', Password::defaults()],
             'role' => 'required|in:user,admin',
         ]);
@@ -175,7 +176,7 @@ class AdminController extends Controller
             'role' => $validated['role'],
         ]);
 
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $user->update(['password' => Hash::make($validated['password'])]);
         }
 
@@ -185,6 +186,7 @@ class AdminController extends Controller
     public function destroyPaste(Paste $paste)
     {
         $paste->delete();
+
         return back()->with('success', 'Paste deleted.');
     }
 
@@ -194,6 +196,7 @@ class AdminController extends Controller
             return back()->with('error', 'You cannot delete your own account.');
         }
         $user->delete();
+
         return back()->with('success', 'User deleted.');
     }
 
@@ -202,6 +205,7 @@ class AdminController extends Controller
         $user->update([
             'role' => $user->isAdmin() ? 'user' : 'admin',
         ]);
+
         return back()->with('success', 'User role updated.');
     }
 

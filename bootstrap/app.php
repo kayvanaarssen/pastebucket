@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SharedContentHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
-            \App\Http\Middleware\HandleInertiaRequests::class,
+            HandleInertiaRequests::class,
         ]);
 
         // Opt-in: only when the app really sits behind a TLS-terminating proxy

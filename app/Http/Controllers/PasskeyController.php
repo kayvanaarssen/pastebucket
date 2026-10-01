@@ -6,7 +6,6 @@ use App\Models\Passkey;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 
 class PasskeyController extends Controller
 {
@@ -33,7 +32,7 @@ class PasskeyController extends Controller
                 'id' => parse_url(config('app.url'), PHP_URL_HOST),
             ],
             'user' => [
-                'id' => $this->base64urlEncode($user->id . ''),
+                'id' => $this->base64urlEncode($user->id.''),
                 'name' => $user->email,
                 'displayName' => $user->name,
             ],
@@ -69,7 +68,7 @@ class PasskeyController extends Controller
         ]);
 
         $challenge = $request->session()->pull('passkey_challenge');
-        if (!$challenge) {
+        if (! $challenge) {
             return response()->json(['error' => 'Challenge expired. Please try again.'], 422);
         }
 
@@ -85,7 +84,7 @@ class PasskeyController extends Controller
         $attestationObject = $this->base64urlDecode($credential['response']['attestationObject']);
         $authData = $this->parseAttestationObject($attestationObject);
 
-        if (!$authData) {
+        if (! $authData) {
             return response()->json(['error' => 'Failed to parse attestation data.'], 422);
         }
 
@@ -146,7 +145,7 @@ class PasskeyController extends Controller
         ]);
 
         $challenge = $request->session()->pull('passkey_auth_challenge');
-        if (!$challenge) {
+        if (! $challenge) {
             return response()->json(['error' => 'Challenge expired.'], 422);
         }
 
@@ -160,7 +159,7 @@ class PasskeyController extends Controller
 
         // Find the passkey
         $passkey = Passkey::where('credential_id', $credential['id'])->first();
-        if (!$passkey) {
+        if (! $passkey) {
             return response()->json(['error' => 'Passkey not found.'], 422);
         }
 
@@ -184,10 +183,10 @@ class PasskeyController extends Controller
         $publicKeyData = json_decode($passkey->public_key, true);
         $authDataBinary = $this->base64urlDecode($credential['response']['authenticatorData']);
         $clientDataHash = hash('sha256', $clientDataJSON, true);
-        $signedData = $authDataBinary . $clientDataHash;
+        $signedData = $authDataBinary.$clientDataHash;
         $signature = $this->base64urlDecode($credential['response']['signature']);
 
-        if (!$this->verifySignature($publicKeyData, $signedData, $signature)) {
+        if (! $this->verifySignature($publicKeyData, $signedData, $signature)) {
             return response()->json(['error' => 'Signature verification failed.'], 422);
         }
 
@@ -245,7 +244,7 @@ class PasskeyController extends Controller
 
     private function base64urlDecode(string $data): string
     {
-        return base64_decode(strtr($data, '-_', '+/') . str_repeat('=', (4 - strlen($data) % 4) % 4));
+        return base64_decode(strtr($data, '-_', '+/').str_repeat('=', (4 - strlen($data) % 4) % 4));
     }
 
     private function parseAttestationObject(string $attestationObject): ?array
@@ -253,7 +252,7 @@ class PasskeyController extends Controller
         // Simple CBOR parsing for attestation object
         // We need to extract authData which contains the public key
         $decoded = $this->cborDecode($attestationObject);
-        if (!$decoded || !isset($decoded['authData'])) {
+        if (! $decoded || ! isset($decoded['authData'])) {
             return null;
         }
 
@@ -268,22 +267,27 @@ class PasskeyController extends Controller
         // rpIdHash and the flag bits are asserted by verifyAuthenticatorData(),
         // which the caller runs against the raw authData returned below.
         $offset = 32;
-        $flags = ord($authData[$offset]); $offset += 1;
-        $counter = unpack('N', substr($authData, $offset, 4))[1]; $offset += 4;
+        $flags = ord($authData[$offset]);
+        $offset += 1;
+        $counter = unpack('N', substr($authData, $offset, 4))[1];
+        $offset += 4;
 
         // Check if attested credential data is present (bit 6)
-        if (!($flags & 0x40)) {
+        if (! ($flags & 0x40)) {
             return null;
         }
 
         // AAGUID (16 bytes)
-        $aaguid = substr($authData, $offset, 16); $offset += 16;
+        $aaguid = substr($authData, $offset, 16);
+        $offset += 16;
 
         // Credential ID length (2 bytes big-endian)
-        $credIdLen = unpack('n', substr($authData, $offset, 2))[1]; $offset += 2;
+        $credIdLen = unpack('n', substr($authData, $offset, 2))[1];
+        $offset += 2;
 
         // Credential ID
-        $credentialId = substr($authData, $offset, $credIdLen); $offset += $credIdLen;
+        $credentialId = substr($authData, $offset, $credIdLen);
+        $offset += $credIdLen;
 
         // Public key (CBOR-encoded COSE key)
         $publicKeyBytes = substr($authData, $offset);
@@ -313,19 +317,19 @@ class PasskeyController extends Controller
      */
     private function validateClientData(mixed $clientData, string $expectedType, string $challenge): ?string
     {
-        if (!is_array($clientData)
-            || !isset($clientData['challenge'], $clientData['origin'], $clientData['type'])
-            || !is_string($clientData['challenge'])
-            || !is_string($clientData['origin'])
-            || !is_string($clientData['type'])) {
+        if (! is_array($clientData)
+            || ! isset($clientData['challenge'], $clientData['origin'], $clientData['type'])
+            || ! is_string($clientData['challenge'])
+            || ! is_string($clientData['origin'])
+            || ! is_string($clientData['type'])) {
             return 'Malformed client data.';
         }
 
-        if (!hash_equals($this->base64urlEncode(base64_decode($challenge)), $clientData['challenge'])) {
+        if (! hash_equals($this->base64urlEncode(base64_decode($challenge)), $clientData['challenge'])) {
             return 'Challenge verification failed.';
         }
 
-        if (!$this->originMatches($clientData['origin'])) {
+        if (! $this->originMatches($clientData['origin'])) {
             return 'Origin verification failed.';
         }
 
@@ -348,8 +352,8 @@ class PasskeyController extends Controller
         $expected = parse_url((string) config('app.url'));
         $actual = parse_url($origin);
 
-        if (!is_array($expected) || !is_array($actual)
-            || !isset($expected['host'], $actual['host'], $actual['scheme'])) {
+        if (! is_array($expected) || ! is_array($actual)
+            || ! isset($expected['host'], $actual['host'], $actual['scheme'])) {
             return false;
         }
 
@@ -378,17 +382,17 @@ class PasskeyController extends Controller
             return 'Malformed authenticator data.';
         }
 
-        if (!hash_equals(hash('sha256', $this->rpId(), true), substr($authData, 0, 32))) {
+        if (! hash_equals(hash('sha256', $this->rpId(), true), substr($authData, 0, 32))) {
             return 'RP ID verification failed.';
         }
 
         $flags = ord($authData[32]);
 
-        if (!($flags & 0x01)) {
+        if (! ($flags & 0x01)) {
             return 'User presence required.';
         }
 
-        if (!($flags & 0x04)) {
+        if (! ($flags & 0x04)) {
             return 'User verification required.';
         }
 
@@ -397,28 +401,34 @@ class PasskeyController extends Controller
 
     private function coseKeyToPem(?array $coseKey): ?string
     {
-        if (!$coseKey) return null;
+        if (! $coseKey) {
+            return null;
+        }
 
         // Algorithm -7 (ES256 / P-256)
         if (isset($coseKey[3]) && $coseKey[3] === -7) {
             $x = $coseKey[-2] ?? null;
             $y = $coseKey[-3] ?? null;
-            if (!$x || !$y) return null;
+            if (! $x || ! $y) {
+                return null;
+            }
 
             // Create uncompressed EC point (0x04 || x || y)
-            $point = "\x04" . $x . $y;
+            $point = "\x04".$x.$y;
 
             // Wrap in SubjectPublicKeyInfo ASN.1 structure for P-256
-            $der = "\x30\x59\x30\x13\x06\x07\x2a\x86\x48\xce\x3d\x02\x01\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07\x03\x42\x00" . $point;
+            $der = "\x30\x59\x30\x13\x06\x07\x2a\x86\x48\xce\x3d\x02\x01\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07\x03\x42\x00".$point;
 
-            return "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----\n";
+            return "-----BEGIN PUBLIC KEY-----\n".chunk_split(base64_encode($der), 64, "\n")."-----END PUBLIC KEY-----\n";
         }
 
         // Algorithm -257 (RS256)
         if (isset($coseKey[3]) && $coseKey[3] === -257) {
             $n = $coseKey[-1] ?? null;
             $e = $coseKey[-2] ?? null;
-            if (!$n || !$e) return null;
+            if (! $n || ! $e) {
+                return null;
+            }
 
             // Build RSA public key DER
             $nLen = strlen($n);
@@ -426,12 +436,12 @@ class PasskeyController extends Controller
 
             $nDer = $this->asn1Integer($n);
             $eDer = $this->asn1Integer($e);
-            $seq = $this->asn1Sequence($nDer . $eDer);
-            $bitString = "\x03" . $this->asn1Length(strlen($seq) + 1) . "\x00" . $seq;
+            $seq = $this->asn1Sequence($nDer.$eDer);
+            $bitString = "\x03".$this->asn1Length(strlen($seq) + 1)."\x00".$seq;
             $algorithmId = "\x30\x0d\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01\x05\x00";
-            $der = $this->asn1Sequence($algorithmId . $bitString);
+            $der = $this->asn1Sequence($algorithmId.$bitString);
 
-            return "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----\n";
+            return "-----BEGIN PUBLIC KEY-----\n".chunk_split(base64_encode($der), 64, "\n")."-----END PUBLIC KEY-----\n";
         }
 
         return null;
@@ -439,15 +449,16 @@ class PasskeyController extends Controller
 
     private function asn1Integer(string $data): string
     {
-        if (ord($data[0]) > 0x7f) {
-            $data = "\x00" . $data;
+        if (ord($data[0]) > 0x7F) {
+            $data = "\x00".$data;
         }
-        return "\x02" . $this->asn1Length(strlen($data)) . $data;
+
+        return "\x02".$this->asn1Length(strlen($data)).$data;
     }
 
     private function asn1Sequence(string $data): string
     {
-        return "\x30" . $this->asn1Length(strlen($data)) . $data;
+        return "\x30".$this->asn1Length(strlen($data)).$data;
     }
 
     private function asn1Length(int $length): string
@@ -458,19 +469,24 @@ class PasskeyController extends Controller
         $bytes = '';
         $temp = $length;
         while ($temp > 0) {
-            $bytes = chr($temp & 0xff) . $bytes;
+            $bytes = chr($temp & 0xFF).$bytes;
             $temp >>= 8;
         }
-        return chr(0x80 | strlen($bytes)) . $bytes;
+
+        return chr(0x80 | strlen($bytes)).$bytes;
     }
 
     private function verifySignature(array $publicKeyData, string $signedData, string $signature): bool
     {
         $pem = $publicKeyData['public_key_pem'] ?? null;
-        if (!$pem) return false;
+        if (! $pem) {
+            return false;
+        }
 
         $publicKey = openssl_pkey_get_public($pem);
-        if (!$publicKey) return false;
+        if (! $publicKey) {
+            return false;
+        }
 
         $alg = $publicKeyData['algorithm'] ?? $publicKeyData['cose_key'][3] ?? null;
 
@@ -493,11 +509,13 @@ class PasskeyController extends Controller
      */
     private function cborDecode(string $data, int &$offset = 0): mixed
     {
-        if ($offset >= strlen($data)) return null;
+        if ($offset >= strlen($data)) {
+            return null;
+        }
 
         $byte = ord($data[$offset]);
         $major = $byte >> 5;
-        $additional = $byte & 0x1f;
+        $additional = $byte & 0x1F;
         $offset++;
 
         $value = $this->cborDecodeValue($data, $offset, $additional);
@@ -505,14 +523,16 @@ class PasskeyController extends Controller
         return match ($major) {
             0 => $value,                    // Unsigned integer
             1 => -1 - $value,               // Negative integer
-            2 => substr($data, $offset, $value) . '' === '' ? '' : (function () use ($data, &$offset, $value) {
+            2 => substr($data, $offset, $value).'' === '' ? '' : (function () use ($data, &$offset, $value) {
                 $result = substr($data, $offset, $value);
                 $offset += $value;
+
                 return $result;
             })(),                           // Byte string
             3 => (function () use ($data, &$offset, $value) {
                 $result = substr($data, $offset, $value);
                 $offset += $value;
+
                 return $result;
             })(),                           // Text string
             4 => (function () use ($data, &$offset, $value) {
@@ -520,6 +540,7 @@ class PasskeyController extends Controller
                 for ($i = 0; $i < $value; $i++) {
                     $arr[] = $this->cborDecode($data, $offset);
                 }
+
                 return $arr;
             })(),                           // Array
             5 => (function () use ($data, &$offset, $value) {
@@ -529,6 +550,7 @@ class PasskeyController extends Controller
                     $val = $this->cborDecode($data, $offset);
                     $map[$key] = $val;
                 }
+
                 return $map;
             })(),                           // Map
             default => null,
@@ -537,16 +559,35 @@ class PasskeyController extends Controller
 
     private function cborDecodeValue(string $data, int &$offset, int $additional): int
     {
-        if ($additional < 24) return $additional;
-        if ($additional === 24) { $val = ord($data[$offset]); $offset++; return $val; }
-        if ($additional === 25) { $val = unpack('n', substr($data, $offset, 2))[1]; $offset += 2; return $val; }
-        if ($additional === 26) { $val = unpack('N', substr($data, $offset, 4))[1]; $offset += 4; return $val; }
+        if ($additional < 24) {
+            return $additional;
+        }
+        if ($additional === 24) {
+            $val = ord($data[$offset]);
+            $offset++;
+
+            return $val;
+        }
+        if ($additional === 25) {
+            $val = unpack('n', substr($data, $offset, 2))[1];
+            $offset += 2;
+
+            return $val;
+        }
+        if ($additional === 26) {
+            $val = unpack('N', substr($data, $offset, 4))[1];
+            $offset += 4;
+
+            return $val;
+        }
         if ($additional === 27) {
             $hi = unpack('N', substr($data, $offset, 4))[1];
             $lo = unpack('N', substr($data, $offset + 4, 4))[1];
             $offset += 8;
+
             return ($hi << 32) | $lo;
         }
+
         return 0;
     }
 }

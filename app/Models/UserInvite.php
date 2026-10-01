@@ -41,6 +41,6 @@ class UserInvite extends Model
 
     public function isValid(): bool
     {
-        return !$this->isUsed() && !$this->isExpired();
+        return ! $this->isUsed() && ! $this->isExpired();
     }
 }

@@ -2,8 +2,8 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ApiTokenController;
-use App\Http\Controllers\ConnectedAppController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\ConnectedAppController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InviteController;
 use App\Http\Controllers\PasskeyController;

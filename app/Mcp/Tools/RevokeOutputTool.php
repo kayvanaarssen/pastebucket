@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\Tools\Concerns\ResolvesOwnPaste;
 use App\Services\PasteService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -28,9 +29,7 @@ class RevokeOutputTool extends Tool
 {
     use ResolvesOwnPaste;
 
-    public function __construct(private readonly PasteService $pastes)
-    {
-    }
+    public function __construct(private readonly PasteService $pastes) {}
 
     public function handle(Request $request): Response|ResponseFactory
     {
@@ -51,7 +50,7 @@ class RevokeOutputTool extends Tool
     }
 
     /**
-     * @return array<string, \Illuminate\JsonSchema\Types\Type>
+     * @return array<string, Type>
      */
     public function schema(JsonSchema $schema): array
     {

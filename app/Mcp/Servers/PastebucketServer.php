@@ -9,6 +9,7 @@ use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
+use Laravel\Mcp\Server\Tool;
 
 /**
  * The hosted MCP endpoint for OAuth clients such as ChatGPT.
@@ -38,7 +39,7 @@ class PastebucketServer extends Server
         TEXT;
 
     /**
-     * @var array<int, class-string<\Laravel\Mcp\Server\Tool>>
+     * @var array<int, class-string<Tool>>
      */
     protected array $tools = [
         PublishOutputTool::class,

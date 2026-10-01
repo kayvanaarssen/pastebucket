@@ -14,11 +14,12 @@ class InviteMail extends Mailable
     use Queueable, SerializesModels;
 
     public string $url;
+
     public string $inviterName;
 
     public function __construct(public UserInvite $invite)
     {
-        $this->url = url('/invite/' . $invite->token);
+        $this->url = url('/invite/'.$invite->token);
         $this->inviterName = $invite->inviter?->name ?? 'An administrator';
     }
 

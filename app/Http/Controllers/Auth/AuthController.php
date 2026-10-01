@@ -42,7 +42,7 @@ class AuthController extends Controller
 
     public function showRegister()
     {
-        if (!Setting::registrationEnabled()) {
+        if (! Setting::registrationEnabled()) {
             return redirect()->route('login')->withErrors(['email' => 'Registration is currently disabled.']);
         }
 
@@ -51,7 +51,7 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        if (!Setting::registrationEnabled()) {
+        if (! Setting::registrationEnabled()) {
             return redirect()->route('login')->withErrors(['email' => 'Registration is currently disabled.']);
         }
 

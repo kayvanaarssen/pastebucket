@@ -16,9 +16,9 @@ class InviteController extends Controller
     {
         $invite = UserInvite::where('token', $token)->first();
 
-        if (!$invite || !$invite->isValid()) {
+        if (! $invite || ! $invite->isValid()) {
             return Inertia::render('Auth/InviteInvalid', [
-                'reason' => !$invite ? 'not_found' : ($invite->isUsed() ? 'used' : 'expired'),
+                'reason' => ! $invite ? 'not_found' : ($invite->isUsed() ? 'used' : 'expired'),
             ]);
         }
 
@@ -33,7 +33,7 @@ class InviteController extends Controller
     {
         $invite = UserInvite::where('token', $token)->first();
 
-        if (!$invite || !$invite->isValid()) {
+        if (! $invite || ! $invite->isValid()) {
             return redirect()->route('login')->withErrors(['email' => 'This invite is no longer valid.']);
         }
 
@@ -44,6 +44,7 @@ class InviteController extends Controller
 
         if (User::where('email', $invite->email)->exists()) {
             $invite->update(['used_at' => now()]);
+
             return redirect()->route('login')->withErrors(['email' => 'An account with this email already exists.']);
         }
 

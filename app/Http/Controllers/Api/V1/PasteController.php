@@ -19,9 +19,7 @@ class PasteController extends Controller
 {
     private const IDEMPOTENCY_KEY_PATTERN = '/^[A-Za-z0-9_.:-]{1,100}$/';
 
-    public function __construct(private readonly PasteService $pastes)
-    {
-    }
+    public function __construct(private readonly PasteService $pastes) {}
 
     /**
      * What this server will accept, so a client can refuse oversized content

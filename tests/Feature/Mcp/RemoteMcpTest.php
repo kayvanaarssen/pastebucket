@@ -9,6 +9,7 @@ use App\Mcp\Tools\RevokeOutputTool;
 use App\Models\OAuthUser;
 use App\Models\Paste;
 use App\Models\User;
+use App\Services\PasteService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
 use Laravel\Passport\ClientRepository;
@@ -259,7 +260,7 @@ class RemoteMcpTest extends TestCase
         ])->assertHasErrors();
 
         config(['pastebucket.api.max_content_bytes' => 5_000_000]);
-        $this->mock(\App\Services\PasteService::class, function ($mock) {
+        $this->mock(PasteService::class, function ($mock) {
             $mock->shouldReceive('maxExpiryHoursFor')->andReturn(8760);
             $mock->shouldReceive('create')->andThrow(new \RuntimeException('Database went away'));
         });
@@ -285,5 +286,4 @@ class RemoteMcpTest extends TestCase
         $this->app['auth']->forgetGuards();
         $this->app['auth']->shouldUse('web');
     }
-
 }

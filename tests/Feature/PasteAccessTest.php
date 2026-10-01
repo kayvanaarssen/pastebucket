@@ -6,9 +6,12 @@ use App\Models\Paste;
 use App\Models\PasteIdempotencyKey;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\EncryptedPayloads;
@@ -193,7 +196,7 @@ class PasteAccessTest extends TestCase
     public function test_rows_from_before_the_column_read_as_code(): void
     {
         // Inserted the way the previous release did, without the new column.
-        \Illuminate\Support\Facades\DB::table('pastes')->insert([
+        DB::table('pastes')->insert([
             'slug' => 'oldrow0000000001',
             'content' => 'legacy plain text',
             'language' => 'markdown',
@@ -256,11 +259,11 @@ class PasteAccessTest extends TestCase
 
         foreach (['api.v1.pastes.store', 'api.v1.pastes.revoke'] as $name) {
             $this->assertFalse($hasCsrf($middlewareFor($name)), "{$name} must not rely on CSRF");
-            $this->assertNotContains(\Illuminate\Session\Middleware\StartSession::class, $middlewareFor($name));
+            $this->assertNotContains(StartSession::class, $middlewareFor($name));
         }
 
         // And the protection really fires outside the test harness's bypass.
-        $middleware = new class(app(), app('encrypter')) extends \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken
+        $middleware = new class(app(), app('encrypter')) extends ValidateCsrfToken
         {
             protected function runningUnitTests()
             {

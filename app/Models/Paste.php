@@ -106,7 +106,7 @@ class Paste extends Model
     {
         return $query->whereNull('revoked_at')->where(function (Builder $query) {
             $query->whereNull('expires_at')
-                  ->orWhere('expires_at', '>', now());
+                ->orWhere('expires_at', '>', now());
         });
     }
 

@@ -17,12 +17,14 @@ use Illuminate\Console\Command;
 class CleanExpiredPastes extends Command
 {
     protected $signature = 'pastes:clean';
+
     protected $description = 'Delete expired and long-revoked pastes, and stale idempotency records';
 
     public function handle(): int
     {
-        if (!config('pastebucket.cleanup_enabled')) {
+        if (! config('pastebucket.cleanup_enabled')) {
             $this->info('Paste cleanup is disabled.');
+
             return self::SUCCESS;
         }
 

@@ -25,9 +25,7 @@ class PasteController extends Controller
 
     private const SHORT_CODE_LENGTH = 6;
 
-    public function __construct(private readonly PasteService $pastes)
-    {
-    }
+    public function __construct(private readonly PasteService $pastes) {}
 
     public function index()
     {
@@ -55,12 +53,12 @@ class PasteController extends Controller
         ]);
 
         // Only logged-in users can create private pastes
-        if ($validated['visibility'] === 'private' && !auth()->check()) {
+        if ($validated['visibility'] === 'private' && ! auth()->check()) {
             $validated['visibility'] = 'unlisted';
         }
 
         // Only logged-in users can create non-expiring pastes
-        if (empty($validated['expiry_hours']) && !auth()->check()) {
+        if (empty($validated['expiry_hours']) && ! auth()->check()) {
             $validated['expiry_hours'] = config('pastebucket.default_expiry_hours', 24);
         }
 
@@ -79,7 +77,7 @@ class PasteController extends Controller
             // An encrypted paste's password never leaves the browser -- it only
             // unwraps the content key there. Storing a hash of it would leak an
             // offline-crackable verifier for the key, so we store nothing.
-            'password' => !$isEncrypted && $validated['password']
+            'password' => ! $isEncrypted && $validated['password']
                 ? Hash::make($validated['password'])
                 : null,
             'visibility' => $validated['visibility'],
@@ -142,7 +140,7 @@ class PasteController extends Controller
         $paste = $this->findPaste($slug);
         $this->ensureAvailable($paste);
 
-        if (!$paste->isOwnedByViewer()) {
+        if (! $paste->isOwnedByViewer()) {
             abort(403, 'Only the paste owner can create a short link.');
         }
 
@@ -197,9 +195,9 @@ class PasteController extends Controller
         // Legacy plaintext pastes still need the server-side password gate. For
         // encrypted pastes the ciphertext is the gate -- the server has no
         // password to check, and the unlock happens in the browser.
-        if (!$paste->isEncrypted() && $paste->isPasswordProtected()) {
+        if (! $paste->isEncrypted() && $paste->isPasswordProtected()) {
             $sessionKey = "paste_unlocked_{$paste->slug}";
-            if (!session($sessionKey)) {
+            if (! session($sessionKey)) {
                 return Inertia::render('PastePassword', [
                     'slug' => $paste->slug,
                     'title' => $paste->title,
@@ -250,7 +248,7 @@ class PasteController extends Controller
         // deleting here is safe. An encrypted paste is not readable until the
         // browser decrypts it, and a viewer arriving without a key would destroy
         // content nobody ever read -- so those wait for an explicit burn ACK.
-        if ($paste->burn_after_read && !$isOwner && !$paste->isEncrypted()) {
+        if ($paste->burn_after_read && ! $isOwner && ! $paste->isEncrypted()) {
             $paste->delete();
         }
 
@@ -269,7 +267,7 @@ class PasteController extends Controller
         $paste = Paste::where('slug', $slug)->first();
 
         // Already burned by a concurrent read -- the desired end state either way.
-        if (!$paste) {
+        if (! $paste) {
             return response()->noContent();
         }
 
@@ -285,7 +283,7 @@ class PasteController extends Controller
 
         // Only ever destroys pastes that opted into burning, so this cannot be
         // turned into a delete primitive for arbitrary pastes.
-        if (!$paste->burn_after_read || !$paste->isEncrypted()) {
+        if (! $paste->burn_after_read || ! $paste->isEncrypted()) {
             abort(403);
         }
 
@@ -293,7 +291,7 @@ class PasteController extends Controller
             abort(403);
         }
 
-        if (!$paste->isOwnedByViewer()) {
+        if (! $paste->isOwnedByViewer()) {
             $paste->delete();
         }
 
@@ -313,7 +311,7 @@ class PasteController extends Controller
 
         $request->validate(['password' => 'required|string']);
 
-        if (!Hash::check($request->password, $paste->password)) {
+        if (! Hash::check($request->password, $paste->password)) {
             return back()->withErrors(['password' => 'Incorrect password.']);
         }
 
@@ -349,7 +347,7 @@ class PasteController extends Controller
             ]);
         }
 
-        if ($paste->isPasswordProtected() && !session("paste_unlocked_{$paste->slug}")) {
+        if ($paste->isPasswordProtected() && ! session("paste_unlocked_{$paste->slug}")) {
             abort(403, 'Password required.');
         }
 
@@ -433,7 +431,7 @@ class PasteController extends Controller
         ];
 
         // Omitted by older pages still open in someone's tab: keep what it was.
-        if (!empty($validated['content_format'])) {
+        if (! empty($validated['content_format'])) {
             $updateData['content_format'] = $validated['content_format'];
         }
 
@@ -448,9 +446,9 @@ class PasteController extends Controller
         // key wrapping the browser just rebuilt, so the column stays null.
         if ($isEncrypted) {
             $updateData['password'] = null;
-        } elseif (!empty($validated['remove_password']) && $validated['remove_password']) {
+        } elseif (! empty($validated['remove_password']) && $validated['remove_password']) {
             $updateData['password'] = null;
-        } elseif (!empty($validated['password'])) {
+        } elseif (! empty($validated['password'])) {
             $updateData['password'] = Hash::make($validated['password']);
         }
 
@@ -463,7 +461,7 @@ class PasteController extends Controller
     {
         $paste = Paste::where('slug', $slug)->firstOrFail();
 
-        if (auth()->id() !== $paste->user_id && !(auth()->user()?->isAdmin())) {
+        if (auth()->id() !== $paste->user_id && ! (auth()->user()?->isAdmin())) {
             abort(403);
         }
 
